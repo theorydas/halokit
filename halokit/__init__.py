@@ -4,4 +4,4 @@ from . import phase
 
 from .units import *
 from .basic import *
-from .cdm_dephasing import *
+from .dephasing import *

@@ -1,8 +1,10 @@
 from .dynamical_friction._evolution import dr2dt
 from .halos import getStaticBreakFrequency, getDynamicBreakFrequency
+from .basic import getFisco, getPeriodFromDistance, getVacuumPhase, getRisco
 from . import units
 
 from scipy.integrate import cumtrapz
+from scipy.special import hyp2f1
 from tqdm.notebook import tqdm
 import numpy as np
 
@@ -97,7 +99,7 @@ def sampleDynamicDephasing(datasetSize: int, f: np.array, m1 = [1e3, 1e5], m2 = 
 
   if scaleFrequencyToISCO:
     # Rescale the input frequency in f_ISCO units.
-    fisco = 2/getPeriodFromDistance(getRisco(M1 +M2), M1 +M2)
+    fisco = 2 *getFisco(M1, M2)
     f = np.logspace(np.log10(np.min(f) *fisco), np.log10(np.max(f) *fisco), len(f)).T
 
   # Calculate the empirical expressions for the dephasing

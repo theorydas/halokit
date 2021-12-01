@@ -1,9 +1,7 @@
-from HaloToolkit.units import *
-from HaloToolkit.basic import *
-from HaloToolkit.dynamical_friction._evolution import dr2dt
+from .units import *
 
 import numpy as np
-from scipy.integrate import cumtrapz, trapz
+from scipy.integrate import cumtrapz
 from scipy.interpolate import interp1d
 
 def getPhaseFromFrequency(fGW: np.array, t: np.array, returnRaw: bool = False):
@@ -26,17 +24,18 @@ def getPhaseFromFrequency(fGW: np.array, t: np.array, returnRaw: bool = False):
     Phase_fit = interp1d(fGW, Phase, bounds_error = False, fill_value = "extrapolate")
     return Phase_fit
 
-def getDephasingFromFrequencyEvolution(t_V: np.array, f_V: np.array, t: np.array, f: np.array, fGWc: float) -> np.array:
-  fGW_V = 2 *f_V
+def getDephasingFromFrequencyEvolution(t0: np.array, f0: np.array, t: np.array, f: np.array, fGWc: float) -> np.array:
+  """ Builds the dephasing of the system with a frequency evolution f(t) with respect to another f0(t0)"""
+  fGW0 = 2 *f0
   fGW = 2 *f
 
-  Phase_V = getPhaseFromFrequency(fGW_V, t_V)
+  Phase0 = getPhaseFromFrequency(fGW0, t0)
   Phase = getPhaseFromFrequency(fGW, t)
 
-  Phase_Vc = lambda f: Phase_V(fGWc) - Phase_V(f)
+  Phase0_c = lambda f: Phase0(fGWc) - Phase0(f)
   Phase_c = lambda f: Phase(fGWc) - Phase(f)
 
   # Calculate the dephasing until merger with respect the vacuum case
-  dPhase = Phase_Vc(fGW) -Phase_c(fGW)
+  dPhase = Phase0_c(fGW) -Phase_c(fGW)
 
   return dPhase

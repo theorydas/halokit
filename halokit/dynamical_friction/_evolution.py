@@ -1,11 +1,10 @@
-from HaloToolkit.units import *
-from HaloToolkit.basic import *
+from halokit.units import *
+from halokit.basic import *
+import halokit.HaloFeedback as HaloFeedback
 
 from scipy.interpolate import interp1d
 from tqdm.notebook import tqdm
 import numpy as np
-
-import HaloToolkit.HaloFeedback as HaloFeedback
 
 def dr2dt(r2: float, m1: float, m2: float, rho_DM_at_r2: float, separate: bool = False) -> float:
   """ Calculates the time derivative [pc/s] of the seperation between the
