@@ -15,7 +15,7 @@ def getRisco(m: float) -> float:
   """ Calculates the radius [pc] of the Innermost Stable Circular Orbit
   for a massive object of mass m [M_sun].
   """
-
+  
   return 6 *G *m *Mo/c**2 /pc # Turn m into pc
 
 def getFisco(m1: float, m2: float) -> float:
