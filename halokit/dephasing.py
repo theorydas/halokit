@@ -1,12 +1,10 @@
 from .dynamical_friction._evolution import dr2dt
+from .halos import getStaticBreakFrequency, getDynamicBreakFrequency
 from . import units
 
 from scipy.integrate import cumtrapz
 from tqdm.notebook import tqdm
 import numpy as np
-
-def lolol():
-  return units.G
 
 def getDephasingUntilMerger_Backbone(m1: float, m2: float, gamma_sp: float, rho_sp: float,
                                 fGW: float, isStatic: bool = True) -> float:
