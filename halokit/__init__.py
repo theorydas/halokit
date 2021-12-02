@@ -1,6 +1,9 @@
 from . import HaloFeedback
-from . import halos
-from . import phase
+
+from .halos import *
+from .phase import *
+from .sadm import *
+from .waveforms import *
 
 from .units import *
 from .basic import *
