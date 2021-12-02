@@ -21,22 +21,22 @@ def getIntrinsicSNRFromDephase(fGW: np.array, dPhase: np.array, Mc: float, Sn = 
   all data.
   """
   if Sn == "LISA": Sn = getNoise_LISA(fGW)
+  if f_max <= 0: f_max = fGW[-1]
   
   # Normalization terms for the SI units of choice.
   frontTerm = 32 *np.pi**(7/3) /c**8 *(G *Mc *Mo)**(10/3)
   psi_V = 1/16 *(c**3 /(np.pi *G *Mc* Mo) )**(5/3)
-
-  # Calculate the phase left until coalescence for the vacuum case. 
-  # Assumes that fc = fISCO and fGW properly includes this as its last point.
-  Ph_V_to_c = lambda f, fc: psi_V *f**(-5/3) -psi_V *fc**(-5/3)
-  Phase_to_c = Ph_V_to_c(fGW, fGW[-1]) -dPhase
-
+  
+  # Calculate the phase left until coalescence for the vacuum case.
+  # Assumes that fc = fISCO and the fGW array properly ends on this point!
+  Phase_to_c = psi_V *fGW**(-5/3) -psi_V *fGW[-1]**(-5/3) -dPhase
+  
   # Calculate the 2nd time derivative for the phase using the inverse from first frequency derivative.
   d2Phasedt2 = 4 *np.pi**2 *fGW *np.nan_to_num(-np.gradient(fGW, Phase_to_c, edge_order = 2))
   
-  # Define the part inside of the integral and compute the integration.
+  # Compute the SNR integration until f_max.
   integrand = fGW**(4/3) / d2Phasedt2 / Sn
-  SNR = np.sqrt(frontTerm *trapz(integrand, fGW))
+  SNR = np.sqrt(frontTerm *trapz(integrand[fGW <= f_max], fGW[fGW <= f_max]))
   
   return SNR
 
