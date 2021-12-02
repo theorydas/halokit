@@ -8,7 +8,7 @@ from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.integrate import simps, trapz, cumtrapz
 from tqdm.notebook import tqdm
 
-def getIntrinsicSNRFromDephase(fGW: np.array, dPhase: np.array, Mc: float, Sn = "LISA") -> float:
+def getIntrinsicSNRFromDephase(fGW: np.array, dPhase: np.array, Mc: float, Sn = "LISA", f_max: float = -1) -> float:
   """ Calculates the intrinsic SNR defined by ignoring spatial parameters like distance and inclination of detector
   for a binary system whose environmental effects imprint a dephasing on the gravitational wave signature.
 
@@ -17,6 +17,8 @@ def getIntrinsicSNRFromDephase(fGW: np.array, dPhase: np.array, Mc: float, Sn = 
   * Mc is the chirp mass [M_sun] of the binary.
   * Sn describes the noise curve of the detector for which to calculate the intrinsic SNR. Defaults to "LISA", else pass
   an np.array for fGW.
+  * f_max is the maximum gravitational frequency [Hz] for which the SNR may be intigrated for. Defaults to -1 to integrate
+  all data.
   """
   if Sn == "LISA": Sn = getNoise_LISA(fGW)
   
@@ -33,8 +35,8 @@ def getIntrinsicSNRFromDephase(fGW: np.array, dPhase: np.array, Mc: float, Sn = 
   d2Phasedt2 = 4 *np.pi**2 *fGW *np.nan_to_num(-np.gradient(fGW, Phase_to_c, edge_order = 2))
   
   # Define the part inside of the integral and compute the integration.
-  integral = fGW**(4/3) / d2Phasedt2 / Sn
-  SNR = np.sqrt(frontTerm *trapz(integral, fGW))
+  integrand = fGW**(4/3) / d2Phasedt2 / Sn
+  SNR = np.sqrt(frontTerm *trapz(integrand, fGW))
   
   return SNR
 
