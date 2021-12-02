@@ -1,4 +1,7 @@
+from typing import Tuple
 from .units import *
+from .basic import getPeriodFromDistance
+from .dynamical_friction._evolution import dr2dt
 
 import numpy as np
 from scipy.integrate import cumtrapz
@@ -39,3 +42,24 @@ def getDephasingFromFrequencyEvolution(t0: np.array, f0: np.array, t: np.array, 
   dPhase = Phase0_c(fGW) -Phase_c(fGW)
 
   return dPhase
+
+def getDephasingFromDensity(r: np.array, rho: np.array, m1: float, m2: float) -> Tuple[np.array, np.array, np.array]:
+  """ Creates the time and orbital frequency evolution of the dephasing until coalescence induced
+  on the binary from its vacuum evolution, because of an effective density profile rho(r).
+  
+  * r is the binary separation [pc] for which the effective density is rho(r).
+  * rho is the effective density [M_sun/pc3] at a given binary separation.
+  * m1, m2 are the masses [M_sun] of the binary components.
+  """
+  # Construct the quantity inside of the integral
+  fGW = 2/getPeriodFromDistance(r, m1 +m2)
+
+  drdtGW, drdtDF = dr2dt(r, m1, m2, rho, separate = True)
+  integrand = fGW *-drdtDF/drdtGW/(drdtGW +drdtDF)
+
+  dPhase = 2 *np.pi *cumtrapz(integrand, r, initial = 0)
+
+  # Calculate the time evolution for the binary
+  t = cumtrapz(1/dr2dt(np.flip(r), m1, m2, rho), np.flip(r), initial = 0)
+
+  return t, np.flip(fGW)/2, np.flip(dPhase), # [s, Hz, rads]

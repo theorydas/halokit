@@ -1,5 +1,7 @@
 # Setup imports
-from units import *
+from .units import *
+from .halos import *
+
 import numpy as np
 
 from scipy.integrate import trapz, simps

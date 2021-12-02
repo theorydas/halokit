@@ -124,7 +124,7 @@ def getNoise_LISA(f: float, considerGalacticBackground: bool = True, useFit = Fa
 
   return Sn +Sc
 
-def getMismatch(f: np.array, h1: Union[np.array, np.array], h2: Union[np.array, np.array], Sn: np.array, skip: int = 1, verbose: bool = False) -> float:
+def getLongMismatch(f: np.array, h1: list, h2: list, Sn: np.array, skip: int = 1, verbose: bool = False) -> float:
   """
   Calculates the mismatch between two strains h1, h2 in the frequency domain given a one-sided
   detector noise sensitivity Sn.
@@ -189,7 +189,8 @@ def buildPhase(f: np.array, dPhase: np.array, m1: float, m2: float):
   else:
     return Phase_to_c
 
-def getTemplatePSD(source: str) -> pd.DataFrame:
+# Old functions
+def getTemplatePSD(source: str) -> np.array:
   """ Imports PSDs from sources and stuff"""
   PSD_Source = {"_LIGO": "https://dcc.ligo.org/public/0149/T1800044/005/aLIGODesign.txt", "LIGO": "https://dcc.ligo.org/public/0156/G1801950/001/2017-06-10_DCH_C02_H1_O2_Sensitivity_strain_asd.txt"}
   
@@ -253,7 +254,7 @@ def normalizeWaveform(h: np.ndarray, t: np.ndarray, PSD = None) -> np.ndarray:
   
   return h/norm
 
-def getMismatchOld(h1, h2, f, psd):
+def getShortMismatch(h1, h2, f, psd):
   # Choose a noise PSD
   PSD = calculatePSD(f, psd)
 
@@ -282,4 +283,4 @@ def getStrainFromDephase_(f: np.array, dPhase: np.array, m1: float, m2: float, s
   return hp +1j *hc
 
 getStrainFromDephase = lambda F, DPHASE, M1, M2: np.array([getStrainFromDephase_(f_, Dph_, m1_, m2_) for f_, Dph_, m1_, m2_ in tqdm(zip(F, DPHASE, M1, M2)) ])
-getMismatch2 = lambda h_true, h_pred, freq: np.array([getMismatchOld(h_true_, h_pred_, freq_, "White") for h_true_, h_pred_, freq_ in tqdm(zip(h_true, h_pred, freq))]).T[0].astype(complex).real
+getShortMismatch = lambda h_true, h_pred, freq: np.array([getShortMismatch(h_true_, h_pred_, freq_, "White") for h_true_, h_pred_, freq_ in tqdm(zip(h_true, h_pred, freq))]).T[0].astype(complex).real

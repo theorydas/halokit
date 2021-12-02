@@ -6,7 +6,7 @@ from scipy.special import gamma, hyp2f1
 def getRsp(gamma_sp: float, m1: float, rho_sp: float) -> float:
   """ Calculates the characteristic radius [pc] of the spike
   assuming a power law distribution.
-  
+   
   * gamma_sp is the slope of the power law.
   * m1 is the mass [M_sun] of the larger component in the binary.
   * rho_sp [Mo/pc3] is the normalisation density of the spike.

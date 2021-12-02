@@ -1,7 +1,5 @@
-from .dynamical_friction._evolution import dr2dt
 from .halos import getStaticBreakFrequency, getDynamicBreakFrequency
-from .basic import getFisco, getPeriodFromDistance, getVacuumPhase, getRisco
-from . import units
+from .basic import getFisco, getVacuumPhase
 
 from scipy.integrate import cumtrapz
 from scipy.special import hyp2f1
@@ -113,18 +111,3 @@ def sampleDynamicDephasing(datasetSize: int, f: np.array, m1 = [1e3, 1e5], m2 = 
     return f, dPhase.astype(float), input
   else:
     return dPhase.astype(float), input
-
-def getDephasingFromDensity(r, rho, m1, m2):
-  # Construct the quantity inside of the integral
-  fGW = 2/getPeriodFromDistance(r, m1 +m2)
-  # integral = fGW *(1/dr2dt(r, m1, m2, rho) -1/dr2dt(r, m1, m2, 0))
-
-  drdtGW, drdtDF = dr2dt(r, m1, m2, rho, separate = True)
-  integral = fGW *-drdtDF/drdtGW/(drdtGW +drdtDF)
-
-  dPhase = 2 *np.pi *cumtrapz(integral, r, initial = 0)
-
-  # Calculate the time evolution for the binary
-  t = cumtrapz(1/dr2dt(np.flip(r), m1, m2, rho), np.flip(r), initial = 0)
-
-  return t, np.flip(fGW)/2, np.flip(dPhase)
