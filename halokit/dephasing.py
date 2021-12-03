@@ -13,7 +13,6 @@ def getDephasingUntilMerger_Backbone(m1: float, m2: float, gamma_sp: float, rho_
   until coalescence as a function of the gravitational wave frequency [Hz] between a vacuum system
   and a system with dynamical friction in either assumption.
 
-  This function creates a power law spike using the HaloFeedback module.
   This function is wrapped by getDephasingUntilMerger().
 
   * m1, m2 are the masses [M_sun] of the two components.
@@ -57,8 +56,7 @@ def getDephasingUntilMerger(m1: float, m2: float, gamma_sp: float, rho_sp: float
   a function of the gravitational wave frequency [Hz] between a vacuum system and a system with
   dynamical friction in either assumption.
 
-  This function creates a power law spike using the HaloFeedback module.
-  This function serves as a wrapped for getDephasingUntilMerger_Backbone() which actually computes the dephasing.
+  This function serves as a wrapper for getDephasingUntilMerger_Backbone() which actually computes the dephasing.
 
   * m1, m2 are the masses [M_sun] of the two components.
   * gamma_sp is the slope of the dark matter distribution.

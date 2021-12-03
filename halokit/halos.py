@@ -34,18 +34,17 @@ def rho_spike(r: float, gamma_sp: float, rho_sp: float, m1: float) -> float:
 
 def rho_spike6(r: float, gamma_sp: float, rho6: float) -> float:
   """ Assumes a powerlaw dark matter spike, and calculates its density [kg/m3]
-  at a given distance r [m] from the center.
+  at a given distance r [pc] from the center.
 
-  * r is the distance [m] from the center at which the distribution should be calculated.
+  * r is the distance [pc] from the center at which the distribution should be calculated.
   * gamma_sp is the slope of the power law.
-  * rho_6 [M_sun/pc3] is the density of the spike at distance r6 = 1e-6 pc.
+  * rho6 [M_sun/pc3] is the density of the spike at distance r6 = 1e-6 pc.
 
   The calculations are based on half of Equation 3 of arxiv.org/abs/2108.04154.
   """
-  rho6 *= Mo/pc**3
-  r6 = 1e-6 *pc
+  r6 = 1e-6
 
-  return rho6 *(r6/r)**gamma_sp
+  return (rho6 *Mo/pc**3) *(r6/r)**gamma_sp
 
 def getRho6FromSpike(rho_spike: float, gamma_sp: float, m1: float) -> float:
   """ A conversion from the spike density normalisation rho_spike [M_sun/pc3] to rho6 [M_sun/pc3].
@@ -53,31 +52,24 @@ def getRho6FromSpike(rho_spike: float, gamma_sp: float, m1: float) -> float:
   * rho_spike is the density normalisation of the spike.
   * gamma_sp is the slope of the density distribution.
   * m1 is the mass [M_sun] of the central(largest) black hole in the binary system.
-  
-  The calculations are based on Equation 4 of arxiv.org/abs/2108.04154. Note that
-  at the time of writting this code, the equation was falsely type-written in
-  the Arxiv submission, laccking a power of gamma_sp. This code, fixes this typo.
   """
-  k = (3 -gamma_sp) *0.2**(3 -gamma_sp) /(2 *np.pi)
-  r6 = 1e-6
+  r6 = 1e-6 # [pc]
+  rsp = getRsp(gamma_sp, m1, rho_spike)
 
-  return rho_spike **(1 - gamma_sp/3) *(k *m1)**(gamma_sp/3) *r6**(-gamma_sp)
+  return rho_spike *(r6/rsp)**gamma_sp
 
-def getRhoSpikeFrom6(rho_6: float, gamma_sp: float, m1: float) -> float:
+def getRhoSpikeFrom6(rho6: float, gamma_sp: float, m1: float) -> float:
   """ A conversion from the spike density normalisation rho6 [M_sun/pc3] to rho_spike [M_sun/pc3].
 
   * rho6 is the density of the spike at distance r6 = 1e-6 pc.
   * gamma_sp is the slope of the density distribution.
   * m1 is the mass [M_sun] of the central(largest) black hole in the binary system.
-  
-  The calculations are based on Equation 4 of arxiv.org/abs/2108.04154. Note that
-  at the time of writting this code, the equation was falsely type-written in
-  the Arxiv submission, laccking a power of gamma_sp. This code, fixes this typo.
   """
-  k = (3 -gamma_sp) *0.2**(3 -gamma_sp) /(2 *np.pi)
-  r6 = 1e-6
+  r6 = 1e-6 *pc
+  A = (3 - gamma_sp) *0.2**(3-gamma_sp) *(m1 *Mo)/(2 *np.pi)
+  A = A **(gamma_sp/3)
 
-  return (rho_6 *r6**gamma_sp / (k *m1)**(gamma_sp/3) )**(1/(1 -gamma_sp/3))
+  return ((rho6 *Mo/pc**3)/A *r6 **gamma_sp)**(1/(1 -gamma_sp/3)) /(Mo/pc**3)
 
 def getKsiCDM(q: float, gamma_sp: float) -> float:
   """ Returns the fraction of particles ksi that move slower than the orbital velocity of the secondary black hole.
