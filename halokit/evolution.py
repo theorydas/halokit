@@ -1,6 +1,7 @@
-from halokit.units import *
-from halokit.basic import *
-import halokit.HaloFeedback as HaloFeedback
+# from halokit.units import *
+from .units import *
+from .basic import *
+from . import HaloFeedback
 
 from scipy.interpolate import interp1d
 from tqdm.notebook import tqdm

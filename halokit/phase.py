@@ -1,7 +1,7 @@
 from typing import Tuple
 from .units import *
 from .basic import getPeriodFromDistance
-from .dynamical_friction._evolution import dr2dt
+from .evolution import dr2dt
 
 import numpy as np
 from scipy.integrate import cumtrapz

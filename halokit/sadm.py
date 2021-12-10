@@ -53,7 +53,7 @@ def getAnnihilationRate(spike, m1: float, weight, s = 0, uf0 = c/5, verbose = Fa
   """
   # Set up the density interpolator
   # Todo: Think about not including the bad area of large separations?
-  _r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/np.min(spike.psi) /pc ), 1000)
+  _r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/np.min(spike.psi) /pc ), 100)
   _psi_grid = G *m1 *Mo/(_r_grid *pc)
   rho_ = spike.getRho(spike, _psi_grid)
 
@@ -67,7 +67,7 @@ def getAnnihilationRate(spike, m1: float, weight, s = 0, uf0 = c/5, verbose = Fa
 
   rate_eps = []
   for eps in tqdm(spike.psi[1:]) if verbose else spike.psi[1:]: # Skip the first to avoid bad results.
-    r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/eps /pc ), 1000, endpoint = False)
+    r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/eps /pc ), 100, endpoint = False)
     psi_grid = G *m1 *Mo /(r_grid *pc)
     rho_grid = rho_(r_grid)
 
@@ -203,7 +203,7 @@ class distributionFunction:
 
     # rho = 4 *np.pi *trapz(u_grid**2 *self.feps(eps_grid), u_grid)
     # ==========
-    eps_grid = np.linspace(Psi -v_cut**2/2, Psi, 10000)
+    eps_grid = np.linspace(Psi -v_cut**2/2, Psi, 50000)
     
     rho = 4 *np.pi *np.sqrt(2) *trapz(np.sqrt(Psi -eps_grid) *self.feps(eps_grid), eps_grid)
     # ==========
@@ -231,7 +231,7 @@ class distributionFunction:
     return 4 *np.pi/self.getRho(self, Psi) *integral
   
   def getVelocityDispersion(self, Psi, Rho = -1):
-    """ Calculates the standard deviation / velocity dispersion [m2/s2] at potential Psi.
+    """ Calculates the velocity distribution's standard deviation / velocity dispersion [m2/s2] at potential Psi.
     """
     
     if Rho == -1:

@@ -1,5 +1,5 @@
-import halokit.HaloFeedback as HaloFeedback
-from halokit.units import *
+import HaloFeedback
+from .units import *
 
 import numpy as np
 
