@@ -237,7 +237,7 @@ class distributionFunction:
     if Rho == -1:
       Rho = self.getRho(self, Psi)
 
-    u_grid = np.linspace(0, np.sqrt(2 *Psi), 50000)
+    u_grid = np.linspace(0, np.sqrt(2 *Psi), 500000)
 
     Average = 4 *np.pi *trapz(u_grid**3 *self.feps(Psi -u_grid**2 /2), u_grid)/Rho
     Squared = 4 *np.pi *trapz(u_grid**4 *self.feps(Psi -u_grid**2 /2), u_grid)/Rho

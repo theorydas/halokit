@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name = "",
-    version = "",
-    author = ""
+    name = "halokit",
+    version = "1.1",
+    author = "me"
 )
