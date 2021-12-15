@@ -47,6 +47,16 @@ def getPotential(m1: float, r: float) -> float:
 
   return G *(m1 *Mo) /(r *pc) # [m2/s2]
 
+def RateNormalizationBHPotential(Psi: float, Psi_max_cutoff: float, m1: float) -> np.array:
+  """ Calculates the accessible energy space? that is available to the particles which
+  acts as a rate normalization? """
+  u = Psi_max_cutoff/Psi -1
+  hyp = hyp2f1(3/2, 4, 5/2, -u)
+
+  norm = (G *m1 *Mo) **3 *Psi**(-5/2) *2/3 *(u)**(3/2) *hyp
+  
+  return norm
+  
 def getAnnihilationRate(spike, m1: float, weight, s = 0, uf0 = c/5, verbose = False):
   """ Calculates the density contribution of the annihilation rate of a dark matter
   distribution. s-wave is s = 0 and p-wave is s = 2.
@@ -60,29 +70,34 @@ def getAnnihilationRate(spike, m1: float, weight, s = 0, uf0 = c/5, verbose = Fa
   if spike.psi_cut != -1:
     rho_[_psi_grid >= spike.psi_cut] = 0
 
-  if s != 0:
+  if s != 0: #TODO Completely replace this by calculating the full double term once? Will this conflict with the eps averaging?
     rho_ *= np.nan_to_num(spike.getVelocityDispersion(spike, _psi_grid, rho_))**s
   
   rho_ = interp1d(_r_grid, rho_)
 
+  # Calculate the accessible-energy averaged annihilation rate.
   rate_eps = []
+  
   for eps in tqdm(spike.psi[1:]) if verbose else spike.psi[1:]: # Skip the first to avoid bad results.
-    r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/eps /pc ), 100, endpoint = False)
+    r_grid = np.logspace(np.log10( G *m1 *Mo/np.max(spike.psi) /pc ), np.log10( G *m1 *Mo/eps /pc ), 1000, endpoint = False)
     psi_grid = G *m1 *Mo /(r_grid *pc)
     rho_grid = rho_(r_grid)
 
-    inside = (r_grid *pc)**2 *np.sqrt(psi_grid - eps)
-    integral = trapz(rho_grid* inside, r_grid *pc)
-    norm = trapz(inside, r_grid *pc) # TODO: Think about calculating analytically when Psi = Gm1/r
-
+    # Integration of the rate through the phase space.
+    integrand = (r_grid *pc)**2 *np.sqrt(psi_grid - eps)
+    integral = trapz(rho_grid* integrand, r_grid *pc)
+    
+    # Calculate the normalization from analytical relationship.
+    norm = RateNormalizationBHPotential(eps, spike.psi.max(), m1)
+    
     rate = integral/norm
     rate_eps.append(rate)
 
   # Extrapolate to the first, skipped element:
-  # rate0 = rate_eps[1] +(Psi[0] -Psi[1]) *(rate_eps[1] -rate_eps[2])/(Psi[1] -Psi[2])
-  rate0 = 1 # It shouldn't matter at ISCO right?, things should be zero there?
+  rate0 = rate_eps[1] +(spike.psi[0] -spike.psi[1]) *(rate_eps[1] -rate_eps[2])/(spike.psi[1] -spike.psi[2])
+  # rate0 = 1 # It shouldn't matter at ISCO right?, things should be zero there?
   rate_eps = np.insert(rate_eps, 0, rate0)
-
+  
   return (weight *1e-6/GeVc2) *np.sqrt(2) *rate_eps/ uf0**s
 
 def getSpikeDF(eps, gamma_sp, rho_sp, m1):
