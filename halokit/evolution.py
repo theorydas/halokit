@@ -17,6 +17,8 @@ def dr2dt(r2: float, m1: float, m2: float, rho_DM_at_r2: float, separate: bool =
   * m1, m2 are the masses [M_sun] of the two components.
   * rho_DM_at_r2 [M_sun/pc3] is the effective density at distance r2 of dark
   matter particles (which are faster than the orbital velocity at that distance).
+  
+  If separate, returns a list of two elements for the gravitational and dynamic friction part.
   """
 
   M = m1 +m2
@@ -52,6 +54,8 @@ def evolveBinary(m1: float, m2: float, Spike: HaloFeedback.PowerLawSpike, r2_0: 
   should be updated or not.
   * verbose when set to False will hide seperation and timestep updates as well
   as the tqdm functionality for keeping track of time.
+  
+  Returns t, r, forbit, rho_eff
   """
   r2 = np.array([r2_0]) # [pc]
   Risco = getRisco(m1) # [pc]
@@ -143,6 +147,8 @@ def evolveBinaryVacuum(m1: float, m2: float, r2_0: float, dtOverT: int = 1000, m
   * r2_0 is the initial seperation [pc].
   * dtOverT is the largest timestep [Periods] possible whenever possible.
   * maxIterations sets the maximum number of steps for the code.
+  
+  Returns t, r, forbit.
   """
   r2 = np.array([r2_0]) # [pc]
   Risco = getRisco(m1) # [pc]

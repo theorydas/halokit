@@ -50,6 +50,8 @@ def getDephasingFromDensity(r: np.array, rho: np.array, m1: float, m2: float) ->
   * r is the binary separation [pc] for which the effective density is rho(r).
   * rho is the effective density [M_sun/pc3] at a given binary separation.
   * m1, m2 are the masses [M_sun] of the binary components.
+  
+  Returns t, fGW/2, dPhase
   """
   # Construct the quantity inside of the integral
   fGW = 2/getPeriodFromDistance(r, m1 +m2)

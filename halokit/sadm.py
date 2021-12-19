@@ -71,6 +71,7 @@ def getAnnihilationRate(spike, m1: float, weight, s = 0, uf0 = c/5, verbose = Fa
     rho_[_psi_grid >= spike.psi_cut] = 0
 
   if s != 0: #TODO Completely replace this by calculating the full double term once? Will this conflict with the eps averaging?
+    # print("Calculating dispersion")
     rho_ *= np.nan_to_num(spike.getVelocityDispersion(spike, _psi_grid, rho_))**s
   
   rho_ = interp1d(_r_grid, rho_)
@@ -209,7 +210,9 @@ class distributionFunction:
 
     return f_eps
   
-  def getRho(self, Psi: float, v_cut = -1, vmin = 0):
+  def getRho(self, Psi: float, v_cut = -1):
+    """ Calculates the density [kg/m3] of contributing particles up until velocity [m/s] v_cut.
+    """
     # If not specified, integrate until maximum bound velocity.
     if v_cut == -1: v_cut = np.sqrt(2 *Psi)
 
