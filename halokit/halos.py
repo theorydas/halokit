@@ -71,16 +71,21 @@ def getRhoSpikeFrom6(rho6: float, gamma_sp: float, m1: float) -> float:
 
   return ((rho6 *Mo/pc**3)/A *r6 **gamma_sp)**(1/(1 -gamma_sp/3)) /(Mo/pc**3)
 
-def getKsiCDM(q: float, gamma_sp: float) -> float:
-  """ Returns the fraction of particles ksi that move slower than the orbital velocity of the secondary black hole.
+def getKsiCDM(q: float, gamma_sp: float, fu: float = -1) -> float:
+  """ Returns the fraction of particles ksi that move slower than the fraction fu of the maximum velocity of the secondary black hole.
 
   * q is the mass ratio of the two components m2/m1.
   * gamma_sp is the slope of the dark matter distribution.
+  * fu is the fraction velocity u/umax. If none is given the orbital velocity is implied.
   """
-  f = 1/2 *(1 +q)
+  if fu == -1:
+    fu = (1 +q)/2
+  elif fu > 2:
+    # Simply scatter with all particles. # TODO: Does that work with arrays?
+    return 1
 
   ksi = 4/3/np.sqrt(np.pi) *gamma(gamma_sp +1)/gamma(gamma_sp -1/2)\
-  *hyp2f1(3/2, 3/2 -gamma_sp, 5/2, f) *f**(3/2)
+    *hyp2f1(3/2, 3/2 -gamma_sp, 5/2, fu**2) *fu**3
   
   return ksi
 
