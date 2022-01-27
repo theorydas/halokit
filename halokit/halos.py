@@ -79,15 +79,16 @@ def getKsiCDM(q: float, gamma_sp: float, fu: float = -1) -> float:
   * fu is the fraction velocity u/umax. If none is given the orbital velocity is implied.
   """
   if fu == -1:
-    fu = (1 +q)/2
-  elif fu > 2:
-    # Simply scatter with all particles. # TODO: Does that work with arrays?
+    fu = np.sqrt((1 +q)/2)
+  elif fu > 2: # Simply scatter with all particles.
     return 1
 
   ksi = 4/3/np.sqrt(np.pi) *gamma(gamma_sp +1)/gamma(gamma_sp -1/2)\
     *hyp2f1(3/2, 3/2 -gamma_sp, 5/2, fu**2) *fu**3
   
   return ksi
+
+getKsiCDM = np.vectorize(getKsiCDM)
 
 def getStaticBreakFrequency(m1: float, m2: float, gamma_sp: float, rho_sp: float) -> float:
   """ Returns the break (equality) frequency [Hz] as defined by the matching of the gravitational
