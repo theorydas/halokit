@@ -2,15 +2,31 @@ from .units import *
 
 import numpy as np
 
-def E_orb(r2: float, m1: float, m2: float) -> float:
+def E_orb(a: float, m1: float, m2: float) -> float:
   """ Calculates the orbital energy [kg*m2/s2] of a binary system.
 
-  * r2 is the seperation [pc] of the two components.
+  * a is the semi-major axis [pc] of the two components's orbit or the separation for circular orbits.
   * m1, m2 are the masses [M_sun] of the components.
   """
 
-  return - G *m1 *m2 *Mo**2 /(2 *r2 *pc)
+  return - G *m1 *m2 *Mo**2 /(2 *a *pc)
 
+def L_orb(a: float, e: float, m1: float, m2: float) -> float:
+    """ Calculates the orbital angular momentum [kg*m2/s] of a binary system.
+    
+    * m1, m2 are the masses [M_sun] of the components.
+    * a is the semi-major axis [pc] of the two components's orbit or the separation for circular orbits.
+    * e is the eccentricity of the orbit.
+    """
+    if e < 0 or e >= 1: raise ValueError("The eccentricity must be within the range [0, 1).")
+    
+    m = m1 +m2 # [M_sun]
+    p = a *(1 -e**2) *pc # [m]
+    
+    L = np.sqrt(G) *m1 *m2 *np.sqrt(p/(m *Mo)) *Mo**2 # [kg*m2/s]
+    
+    return L # [kg*m2/s]
+    
 def getRisco(m: float) -> float:
   """ Calculates the radius [pc] of the Innermost Stable Circular Orbit
   for a massive object of mass m [M_sun].
