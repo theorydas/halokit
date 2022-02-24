@@ -23,7 +23,7 @@ def L_orb(a: float, e: float, m1: float, m2: float) -> float:
     m = m1 +m2 # [M_sun]
     p = a *(1 -e**2) *pc # [m]
     
-    L = np.sqrt(G) *m1 *m2 *np.sqrt(p/(m *Mo)) *Mo**2 # [kg*m2/s]
+    L = m1 *m2 *np.sqrt(G *p/(m *Mo)) *Mo**2 # [kg*m2/s]
     
     return L # [kg*m2/s]
     
@@ -32,7 +32,7 @@ def getRisco(m: float) -> float:
   for a massive object of mass m [M_sun].
   """
   
-  return 6 *G *m *Mo/c**2 /pc # Turn m into pc
+  return 6 *G *m *Mo/c**2 /pc # [pc]
 
 def getFisco(m1: float, m2: float) -> float:
   """ Calculates the orbital frequency [Hz] of the Innermost Stable Circular Orbit
