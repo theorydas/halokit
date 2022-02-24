@@ -1,6 +1,6 @@
 # halokit
 
-Has stuff that I frequently use in my thesis for researching dm halos and their interactions with blak holes.
+A collection of code, functions and units that provide utility in my dark matter halo reasearch ranging from calculating orbit quantities to updating density distributions due to custom self annihilations. Unless stated otherwise in the list below, everything has been coded and maintented by myself.
 
 ## Contents
 
@@ -13,9 +13,10 @@ The package is split into files depending on their usage theme or origin.
 * `dephasing.py` - Functions that produce the fiducial static CDM dephasing and empirical approximation for dynamic CDM systems.
 * `phase.py` - Utilities to calculate phase and dephasing related quantities.
 * `waveforms.py` - Waveform and mismatch builders from dephasing and other relevant quantities.
-* `evolution.py` - Code and differentials for evolving the EMRI-Halo systems while to account for feedback.
-* `dfriction.py` - Energy related quantities for the EMRI-Halo systems.
-* `HaloFeedback.py` - A stable iteration of Bradley's HaloFeedback package: https://github.com/bradkav/HaloFeedback.
+* `evolution.py` - Code and differentials for evolving the IMRI-Halo systems while to account for feedback.
+* `dfriction.py` - Energy-related quantities for the IMRI-Halo systems.
+
+* `HaloFeedback.py` - A stable iteration of Bradley's HaloFeedback package: https://github.com/bradkav/HaloFeedback altered to support fully customisable spikes.
 * `gravatoms.py` - Ionisation rate calculations for gravitational atom systems, mostly coded by Gimmy.
 
 ## Requirements
