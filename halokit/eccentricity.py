@@ -5,6 +5,21 @@ from .units import *
 from .halos import getKsiCDM, rho_spike
 from . import HaloFeedback
 
+def getGridSizeForEccentricity(e: float) -> float:
+    """ Returns an empirical grid size for integration of eliptical orbits roughly based on
+    the eccentricity number to improve speed when convergence is easier with fewer points.
+    """
+    if e < 0.01:
+        N_grid = 3
+    elif e < 0.3:
+        N_grid = 20
+    elif e < 0.6:
+        N_grid = 40
+    else:
+        N_grid = 100
+    
+    return N_grid
+
 def getEccentricDistance(a: float, e: float, phi: float) -> float:
     """ Calculates the real distance [a units] from the center of an elliptic orbit with eccentricity e and semimajor
     axis a at the true anomaly phi.
@@ -95,20 +110,21 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
     
     return F
 
-def averageLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True, N_grid = 100) -> tuple:
+def averageLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True, N_grid = 40) -> tuple:
     m1 = spike.M_BH; m2 = spike.M_NS
-    
     m = m1 +m2 # [M_sun] The total mass.
     
     # Generate the force around the orbit.
-    phi = np.linspace(0, 2 *np.pi, N_grid) # [rad]
+    N_grid = getGridSizeForEccentricity(e)
+    
+    phi = np.linspace(0, np.pi, N_grid) # [rad]
     r = getEccentricDistance(a, e, phi) # [pc]
     u = getEccentricVelocity(a, e, phi, m) # [m/s]
     F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) # [kg m/s2]
     
     # Integrate forces and add weights.
-    int1 = simpson(F *u / (1 +e *np.cos(phi))**2, phi)
-    int2 = simpson(F /u / (1 +e *np.cos(phi))**2, phi)
+    int1 = 2 *simpson(F *u / (1 +e *np.cos(phi))**2, phi)
+    int2 = 2 *simpson(F /u / (1 +e *np.cos(phi))**2, phi)
     
     dEdt = (1 -e**2)**(3/2) /2/np.pi *int1
     dLdt = (1 -e**2)**(3/2) /2/np.pi *int2 *np.sqrt(G *(m *Mo) *(a *pc) *(1 -e**2))
