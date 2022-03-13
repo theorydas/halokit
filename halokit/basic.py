@@ -41,15 +41,15 @@ def getFisco(m1: float, m2: float) -> float:
 
   return 1/getPeriodFromDistance(getRisco(m1), m1 +m2)
 
-def getPeriodFromDistance(r2: float, M_tot: float) -> float:
+def getPeriodFromDistance(a: float, M_tot: float) -> float:
   """ Calculates the Kepplerian period [s] of binary system with
-  total mass [M_sun] M_tot at a seperation r2 [pc].
+  total mass [M_sun] M_tot at a semi-major axis a [pc].
   """
 
-  return (r2 *pc)**(3/2) *2*np.pi / np.sqrt(G *M_tot *Mo)
+  return (a *pc)**(3/2) *2*np.pi / np.sqrt(G *M_tot *Mo)
 
 def getDistanceFromPeriod(T: float, M_tot: float) -> float:
-  """ Calculates the seperation [pc] r2 of a binary system with
+  """ Calculates the semi-major axis [pc] a of a binary system with
   total mass [M_sun] M_tot with a period T [s].
   """
   

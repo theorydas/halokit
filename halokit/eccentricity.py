@@ -3,18 +3,21 @@ from scipy.integrate import simpson
 
 from .units import *
 from .halos import getKsiCDM, rho_spike
+from .basic import E_orb, L_orb
 from . import HaloFeedback
 
 def getGridSizeForEccentricity(e: float) -> float:
     """ Returns an empirical grid size for integration of eliptical orbits roughly based on
     the eccentricity number to improve speed when convergence is easier with fewer points.
     """
-    if e < 0.01:
-        N_grid = 3
+    if e == 0:
+        N_grid = 1
+    elif e < 0.02:
+        N_grid = 5
     elif e < 0.3:
-        N_grid = 20
+        N_grid = 30
     elif e < 0.6:
-        N_grid = 40
+        N_grid = 60
     else:
         N_grid = 100
     
@@ -28,7 +31,7 @@ def getEccentricDistance(a: float, e: float, phi: float) -> float:
     * e is the eccentricity.
     * phi is the true anomaly [rad].
     """
-    if e < 0 or e >= 1: raise ValueError("The eccentricity must be within the range [0, 1).")
+    if e < 0 or e >= 1: raise ValueError("The orbit eccentricity must be within the range [0, 1).")
     
     p = a *(1 -e**2)
     r = p/(1 +e *np.cos(phi))
@@ -44,7 +47,7 @@ def getEccentricVelocity(a: float, e: float, phi: float, m: float) -> float:
     * phi is the true anomaly [rad].
     * m is the total mass [M_sun] of the components.
     """
-    if e < 0 or e >= 1: raise ValueError("The eccentricity must be within the range [0, 1).")
+    if e < 0 or e >= 1: raise ValueError("The orbit eccentricity must be within the range [0, 1).")
     
     r = getEccentricDistance(a, e, phi) # [pc]
     u2 = G *m *Mo *(2*a -r)/a/r /pc # [m2/s2] Scrambled terms to avoid numerical truncation.
@@ -101,7 +104,7 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
         umax = np.sqrt(2 *G *m1 *Mo/r/pc) # [m/s]
         
         # The fraction of the density with DM particles moving u < uorb of the companion.
-        ksi = getKsiCDM(m2/m1, spike.gamma, u/umax) if phaseSpace else 1 #getKsiCDM(m2/m1, spike.gamma)
+        ksi = getKsiCDM(m2/m1, spike.gamma, u/umax) if phaseSpace else 1
         rho = rho_spike(r, spike.gamma, spike.rho_sp, m1) *ksi
     else:
         rho = spike.rho(r, v_cut = u/1000) *Mo/pc**3 # [kg/m3]
@@ -110,23 +113,50 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
     
     return F
 
-def averageLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True, N_grid = 40) -> tuple:
+def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True) -> tuple:
+    """ Calculates the time-averaged energy and angular momentum rates experienced by the components of the
+    spike-halo system due to dynamical friction over a single orbit.
+    
+    * spike is a HaloFeedback distribution function that describes the system.
+    * a is the semi-major axis [pc] of the orbit.
+    * e is the eccentricity of the orbit.
+    * isStaticCDM controls if a static CDM spike will be assumed based on the spike's parameters.
+    * phaseSpace controls if the static CDM spike will have constant or moving particles.
+    """
     m1 = spike.M_BH; m2 = spike.M_NS
     m = m1 +m2 # [M_sun] The total mass.
     
-    # Generate the force around the orbit.
-    N_grid = getGridSizeForEccentricity(e)
+    if e == 0:
+        u = getEccentricVelocity(a, 0, 0, m) # [m/s]
+        dEdt = F_DF(a, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) *u
+        dLdt = dEdt /np.sqrt(G *m *Mo/ (a *pc)**3)
+        
+        return dEdt, dLdt
     
-    phi = np.linspace(0, np.pi, N_grid) # [rad]
-    r = getEccentricDistance(a, e, phi) # [pc]
-    u = getEccentricVelocity(a, e, phi, m) # [m/s]
+    # Generate the force around the orbit.
+    N_grid = 2 *getGridSizeForEccentricity(e)
+    
+    theta = np.linspace(0, np.pi, N_grid) # [rad]
+    r = getEccentricDistance(a, e, theta) # [pc]
+    u = getEccentricVelocity(a, e, theta, m) # [m/s]
     F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) # [kg m/s2]
     
     # Integrate forces and add weights.
-    int1 = 2 *simpson(F *u / (1 +e *np.cos(phi))**2, phi)
-    int2 = 2 *simpson(F /u / (1 +e *np.cos(phi))**2, phi)
+    int1 = 2 *simpson(F *u / (1 +e *np.cos(theta))**2, theta)
+    int2 = 2 *simpson(F /u / (1 +e *np.cos(theta))**2, theta)
     
     dEdt = (1 -e**2)**(3/2) /2/np.pi *int1
     dLdt = (1 -e**2)**(3/2) /2/np.pi *int2 *np.sqrt(G *(m *Mo) *(a *pc) *(1 -e**2))
     
     return dEdt, dLdt
+
+def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float) -> tuple:
+    dadt = dEdt *2 *(a *pc)**2 / (G *m1 *m2 *Mo**2) /pc # [pc/s]
+    if e > 0:
+        dedt = -(1 -e**2)/2/e *(dEdt/E_orb(a, m1, m2) +2 *dLdt/L_orb(a, e, m1, m2)) # [1/s]
+    else:
+        dedt = 0
+    
+    return dadt, dedt
+
+getOrbitUpdate = np.vectorize(getOrbitUpdate)

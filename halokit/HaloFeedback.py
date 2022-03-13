@@ -165,7 +165,8 @@ class DistributionFunction(ABC):
         return G_N * self.M_NS / (v_orb ** 2)
 
     def b_min(self, v_orb):
-        return 15.0 / pc_to_km
+        # return 15.0 / pc_to_km
+        return 6.0 * G_N * self.M_NS/ c ** 2 # [pc]
 
     def b_max(self, v_orb):
         return self.Lambda * np.sqrt(self.b_90(v_orb) ** 2 + self.b_min(v_orb) ** 2)
@@ -176,6 +177,18 @@ class DistributionFunction(ABC):
     def eps_max(self, v_orb):
         return 2 * v_orb ** 2 / (1 + self.b_min(v_orb) ** 2 / self.b_90(v_orb) ** 2)
 
+    def df(self, r0, v_orb, v_cut=-1):
+        """The change in distribution function f(eps).
+
+        Parameters:
+            - r0 : radial position of the perturbing body [pc]
+            - v_orb: orbital velocity of the perturbing body [km/s]
+            - v_cut: optional, only scatter with particles slower than v_cut [km/s]
+                        defaults to v_max(r) (i.e. all particles)
+        """
+        
+        return self.df_minus(r0, v_orb, v_cut, N_KICK) +self.df_plus(r0, v_orb, v_cut, N_KICK)
+    
     def dfdt(self, r0, v_orb, v_cut=-1):
         """Time derivative of the distribution function f(eps).
 
@@ -185,10 +198,9 @@ class DistributionFunction(ABC):
             - v_cut: optional, only scatter with particles slower than v_cut [km/s]
                         defaults to v_max(r) (i.e. all particles)
         """
-
-        return self.dfdt_minus(r0, v_orb, v_cut, N_KICK) + self.dfdt_plus(
-            r0, v_orb, v_cut, N_KICK
-        )
+        T_orb = (2 * np.pi * r0 * pc_to_km) / v_orb
+        
+        return self.df_minus(r0, v_orb, v_cut, N_KICK)/T_orb +self.df_plus(r0, v_orb, v_cut, N_KICK)/T_orb
 
     def delta_f(self, r0, v_orb, dt, v_cut=-1):
         """Change in f over a time-step dt.
@@ -322,7 +334,7 @@ class DistributionFunction(ABC):
     # ----- df/dt      ----
     # ---------------------
 
-    def dfdt_minus(self, r0, v_orb, v_cut=-1, n_kick=1):
+    def df_minus(self, r0, v_orb, v_cut=-1, n_kick=1):
         """Particles to remove from the distribution function at energy E."""
         if v_cut < 0:
             v_cut = self.v_max(r0)
@@ -351,8 +363,9 @@ class DistributionFunction(ABC):
         # Sum over the kicks
         for delta_eps, b, frac in zip(delta_eps_list, b_list, frac_list):
             # Define which energies are allowed to scatter
-            mask = (self.eps_grid > self.psi(r0) * (1 - b / r0) - 0.5 * v_cut ** 2) & (
-                self.eps_grid < self.psi(r0) * (1 + b / r0)
+            _psir0 = self.psi(r0)
+            mask = (self.eps_grid > _psir0 * (1 - b / r0) - 0.5 * v_cut ** 2) & (
+                self.eps_grid < _psir0 * (1 + b / r0)
             )
 
 
@@ -370,11 +383,11 @@ class DistributionFunction(ABC):
 
 
             N1 = np.zeros(len(m))
-            if np.sum(mask1) > 0:
+            if np.any(mask1):
                 N1[mask1] = ellipe(m[mask1]) - ellipeinc(
                     (np.pi - alpha2[mask1]) / 2, m[mask1]
                 )
-            if np.sum(mask2) > 0:
+            if np.any(mask2):
                 N1[mask2] = ellipeinc_alt((np.pi - alpha1[mask2]) / 2, m[mask2])
             df[mask] += (
                 -frac
@@ -384,7 +397,6 @@ class DistributionFunction(ABC):
                 * N1
             )
 
-        T_orb = (2 * np.pi * r0 * pc_to_km) / v_orb
         norm = (
             2
             * np.sqrt(2 * (self.psi(r0)))
@@ -393,9 +405,9 @@ class DistributionFunction(ABC):
             * r0
             * (self.b_90(v_orb) ** 2 / (v_orb) ** 2)
         )
-        return norm * df / T_orb / self.DoS
+        return norm * df / self.DoS
 
-    def dfdt_plus(self, r0, v_orb, v_cut=-1, n_kick=1, correction=1):
+    def df_plus(self, r0, v_orb, v_cut=-1, n_kick=1, correction=1):
         """Particles to add back into distribution function from E - dE -> E."""
         if v_cut < 0:
             v_cut = self.v_max(r0)
@@ -434,7 +446,7 @@ class DistributionFunction(ABC):
             )
 
             # Sometimes, this mask has no non-zero entries
-            if np.sum(mask) > 0:
+            if np.any(mask):
                 r_eps = G_N * self.M_BH / eps_old[mask]
                 r_cut = G_N * self.M_BH / (eps_old[mask] + 0.5 * v_cut ** 2)
 
@@ -452,11 +464,11 @@ class DistributionFunction(ABC):
                 mask2 = (m > 1) & (alpha2 > alpha1)
 
                 N1 = np.zeros(len(m))
-                if np.sum(mask1) > 0:
+                if np.any(mask1):
                     N1[mask1] = ellipe(m[mask1]) - ellipeinc(
                         (np.pi - alpha2[mask1]) / 2, m[mask1]
                     )
-                if np.sum(mask2) > 0:
+                if np.any(mask2):
                     N1[mask2] = ellipeinc_alt(
                         (np.pi - alpha1[mask2]) / 2, m[mask2]
                     )  # - ellipeinc_alt((np.pi - alpha2[mask2])/2, m[mask2])
@@ -469,7 +481,6 @@ class DistributionFunction(ABC):
                     * N1
                 )
 
-        T_orb = (2 * np.pi * r0 * pc_to_km) / v_orb
         norm = (
             2
             * np.sqrt(2 * (self.psi(r0)))
@@ -478,7 +489,7 @@ class DistributionFunction(ABC):
             * r0
             * (self.b_90(v_orb) ** 2 / (v_orb) ** 2)
         )
-        return norm * df / T_orb / self.DoS
+        return norm * df / self.DoS
 
     def dEdt_ej(self, r0, v_orb, v_cut=-1, n_kick=N_KICK, correction=np.ones(N_GRID)):
         """Calculate carried away by particles which are completely unbound.
@@ -534,7 +545,7 @@ class DistributionFunction(ABC):
             r_eps = G_N * self.M_BH / self.eps_grid[mask]
             r_cut = G_N * self.M_BH / (self.eps_grid[mask] + 0.5 * v_cut ** 2)
 
-            if np.sum(mask) > 0:
+            if np.any(mask):
 
                 L1 = np.minimum((r0 - r0 ** 2 / r_eps) / b, 0.999999)
                 alpha1 = np.arccos(L1)
@@ -546,11 +557,11 @@ class DistributionFunction(ABC):
                 mask2 = (m > 1) & (alpha2 > alpha1)
 
                 N1 = np.zeros(len(m))
-                if np.sum(mask1) > 0:
+                if np.any(mask1):
                     N1[mask1] = ellipe(m[mask1]) - ellipeinc(
                         (np.pi - alpha2[mask1]) / 2, m[mask1]
                     )
-                if np.sum(mask2) > 0:
+                if np.any(mask2):
                     N1[mask2] = ellipeinc_alt((np.pi - alpha1[mask2]) / 2, m[mask2])
 
                 dE[mask] += (
