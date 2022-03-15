@@ -1,3 +1,4 @@
+from sympy import false
 from .units import *
 
 import numpy as np
@@ -26,7 +27,9 @@ def L_orb(a: float, e: float, m1: float, m2: float) -> float:
     L = m1 *m2 *np.sqrt(G *p/(m *Mo)) *Mo**2 # [kg*m2/s]
     
     return L # [kg*m2/s]
-    
+
+L_orb = np.vectorize(L_orb)
+
 def getRisco(m: float) -> float:
   """ Calculates the radius [pc] of the Innermost Stable Circular Orbit
   for a massive object of mass m [M_sun].
@@ -40,6 +43,14 @@ def getFisco(m1: float, m2: float) -> float:
   """
 
   return 1/getPeriodFromDistance(getRisco(m1), m1 +m2)
+
+def getOrbitalFrequency(a: float, M_tot: float, mu: float = 0):
+  """ Calculates the Kepplerian orbital frequency [Hz] of the binary system with
+  total mass [M_sun] M_tot at a semi-major axis a [pc]. If mu is provided, it will calculate
+  1.5 PN-corrected orbital frequency.
+  """
+  
+  return 1
 
 def getPeriodFromDistance(a: float, M_tot: float) -> float:
   """ Calculates the Kepplerian period [s] of binary system with
