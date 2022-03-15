@@ -1,3 +1,4 @@
 halokit.egg-info
 __pycache__
 README.md
+halokit/eccentricity.py
