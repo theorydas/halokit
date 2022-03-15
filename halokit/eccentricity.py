@@ -7,13 +7,13 @@ from .basic import E_orb, L_orb
 from . import HaloFeedback
 
 def getGridSizeForEccentricity(e: float) -> float:
-    """ Returns an empirical grid size for integration of eliptical orbits roughly based on
-    the eccentricity number to improve speed when convergence is easier with fewer points.
+    """ Returns an empirically calcultaed grid size for integration of eliptical orbits roughly based on
+    the eccentricity number to improve speed when convergence is easier on lower eccentricities.
     """
     if e == 0:
         N_grid = 1
-    elif e < 0.02:
-        N_grid = 5
+    elif e < 0.01:
+        N_grid = 15
     elif e < 0.3:
         N_grid = 30
     elif e < 0.6:
@@ -23,33 +23,32 @@ def getGridSizeForEccentricity(e: float) -> float:
     
     return N_grid
 
-def getEccentricDistance(a: float, e: float, phi: float) -> float:
+def getSeparation(a: float, e: float, theta: float) -> float:
     """ Calculates the real distance [a units] from the center of an elliptic orbit with eccentricity e and semimajor
-    axis a at the true anomaly phi.
+    axis a at the true anomaly theta.
     
     * a is the semi-major axis of the orbit.
     * e is the eccentricity.
-    * phi is the true anomaly [rad].
+    * theta is the true anomaly [rad].
     """
     if e < 0 or e >= 1: raise ValueError("The orbit eccentricity must be within the range [0, 1).")
     
-    p = a *(1 -e**2)
-    r = p/(1 +e *np.cos(phi))
+    p = a *(1 -e**2) # [a units]
     
-    return r
+    return p/(1 +e *np.cos(theta)) # [a units]
 
-def getEccentricVelocity(a: float, e: float, phi: float, m: float) -> float:
+def getOrbitalVelocity(a: float, e: float, theta: float, m: float) -> float:
     """ Calculates the orbital velocity [m/s] of an elliptic orbit with eccentricity e and semimajor
-    axis a at the true anomaly phi and components with total mass m.
+    axis a at the true anomaly theta and components with total mass m.
     
     * a is the semi-major axis [pc] of the orbit.
     * e is the eccentricity.
-    * phi is the true anomaly [rad].
+    * theta is the true anomaly [rad].
     * m is the total mass [M_sun] of the components.
     """
     if e < 0 or e >= 1: raise ValueError("The orbit eccentricity must be within the range [0, 1).")
     
-    r = getEccentricDistance(a, e, phi) # [pc]
+    r = getSeparation(a, e, theta) # [pc]
     u2 = G *m *Mo *(2*a -r)/a/r /pc # [m2/s2] Scrambled terms to avoid numerical truncation.
     
     return np.sqrt(u2) # [m/s]
@@ -64,7 +63,7 @@ def dEdt_GW(m1, m2, a, e):
     * a the semi major axis in pc.
     """
     m = m1 +m2 # [M_sun] The total mass of the binary.
-    mu = m1*m2/m # The reduced mass of the binary.
+    mu = m1*m2/m # [M_sun] The reduced mass of the binary.
     
     dEdt = 32/5 *mu**2 *m**3/(a *pc)**5 *G**4 / c**5 *Mo**5
     dEdt *= (1 +73/24 *e**2 +37/96 *e**4) *(1 -e**2)**(-7/2) # Weight because of non-zero eccentricity.
@@ -79,7 +78,7 @@ def dLdt_GW(m1, m2, a, e):
     * a the semi major axis in pc.
     """
     m = m1 +m2 # The total mass of the binary.
-    mu = m1*m2/m # The reduced mass of the binary.
+    mu = m1*m2/m # [M_sun] The reduced mass of the binary.
     
     dLdt = 32/5 *(mu *Mo)**2 *(m *Mo)**(5/2)/(a *pc)**(7/2) *G**(7/2) / c**5
     dLdt *= (1 +7/8*e**2) /(1 -e**2)**2 # Weight because of non-zero eccentricity.
@@ -114,7 +113,7 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
     return F
 
 def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True) -> tuple:
-    """ Calculates the time-averaged energy and angular momentum rates experienced by the components of the
+    """ Calculates the time-averaged energy and angular momentum loss rates experienced by the components of the
     spike-halo system due to dynamical friction over a single orbit.
     
     * spike is a HaloFeedback distribution function that describes the system.
@@ -126,8 +125,8 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     m1 = spike.M_BH; m2 = spike.M_NS
     m = m1 +m2 # [M_sun] The total mass.
     
-    if e == 0:
-        u = getEccentricVelocity(a, 0, 0, m) # [m/s]
+    if e == 0: # Bypass the force averaging for circular orbits.
+        u = getOrbitalVelocity(a, 0, 0, m) # [m/s]
         dEdt = F_DF(a, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) *u
         dLdt = dEdt /np.sqrt(G *m *Mo/ (a *pc)**3)
         
@@ -135,18 +134,18 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     
     # Generate the force around the orbit.
     N_grid = 2 *getGridSizeForEccentricity(e)
-    
     theta = np.linspace(0, np.pi, N_grid) # [rad]
-    r = getEccentricDistance(a, e, theta) # [pc]
-    u = getEccentricVelocity(a, e, theta, m) # [m/s]
+    
+    r = getSeparation(a, e, theta) # [pc]
+    u = getOrbitalVelocity(a, e, theta, m) # [m/s]
     F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) # [kg m/s2]
     
     # Integrate forces and add weights.
-    int1 = 2 *simpson(F *u / (1 +e *np.cos(theta))**2, theta)
-    int2 = 2 *simpson(F /u / (1 +e *np.cos(theta))**2, theta)
+    int1 = simpson(F *u / (1 +e *np.cos(theta))**2, theta/np.pi)
+    int2 = simpson(F /u / (1 +e *np.cos(theta))**2, theta/np.pi)
     
-    dEdt = (1 -e**2)**(3/2) /2/np.pi *int1
-    dLdt = (1 -e**2)**(3/2) /2/np.pi *int2 *np.sqrt(G *(m *Mo) *(a *pc) *(1 -e**2))
+    dEdt = (1 -e**2)**(3/2) *int1
+    dLdt = (1 -e**2)**(3/2) *int2 *np.sqrt(G *(m *Mo) *(a *pc) *(1 -e**2))
     
     return dEdt, dLdt
 
