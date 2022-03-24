@@ -1,6 +1,6 @@
 # Physical Constants
 GeVc2 = 1.78266192e-27 # kg
-G = 6.67408e-11 # m3/kg/s2, The Newtonian gravitational constant
+G = 6.67430e-11 # m3/kg/s2, The Newtonian gravitational constant [Legacy: 6.67408]
 c = 299792458 # m/s, The Speed of light in a vacuum
 
 # Useful Unit Conversions
