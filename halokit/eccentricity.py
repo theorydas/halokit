@@ -15,9 +15,9 @@ def getGridSizeForEccentricity(e: float) -> float:
     elif e < 0.01:
         N_grid = 15
     elif e < 0.3:
-        N_grid = 30
+        N_grid = 50
     elif e < 0.6:
-        N_grid = 60
+        N_grid = 90
     else:
         N_grid = 100
     
@@ -85,7 +85,7 @@ def dLdt_GW(m1, m2, a, e):
     
     return dLdt
 
-def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticCDM = False, phaseSpace: bool = True) -> float:
+def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticCDM = False, phaseSpace: bool = True, Lambda = True) -> float:
     """ Calculates the dissipative force of dynamical friction of a binary-spike system at a position r from
     the center and with orbital velocity u. The force is connected to the energy loss as dEdt_DF = F_DF *u.
     
@@ -94,9 +94,15 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
     * u is the orbital velocity [m/s] of the secondary component interacting with the spike.
     * phaseSpace controls wether the kinematics of the spike will be taken into consideration in the friction.
     """
-    m1 = spike.M_BH; m2 = spike.M_NS
+    m1 = spike.m1; m2 = spike.m2
     
-    Lambda = np.sqrt(m1/m2)
+    if Lambda == True:
+        Lambda_ = spike.Lambda(r, u/1000)#(r *pc) *u**2 / (G *np.sqrt(m1 *m2 *Mo**2))
+        # print(1 -spike.Lambda(r, u/1000)/Lambda_)
+    elif Lambda == False:
+        Lambda_ = np.sqrt(m1/m2)
+    else:
+        Lambda_ = Lambda
     
     if isStaticCDM:
         # The maximum velocity of allowed DM particles at position r.
@@ -104,15 +110,18 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
         
         # The fraction of the density with DM particles moving u < uorb of the companion.
         ksi = getKsiCDM(m2/m1, spike.gamma, u/umax) if phaseSpace else 1
-        rho = rho_spike(r, spike.gamma, spike.rho_sp, m1) *ksi
+        rho = rho_spike(r, spike.gamma, spike.rho_sp, m1) *ksi # [kg/m3]
     else:
-        rho = spike.rho(r, v_cut = u/1000) *Mo/pc**3 # [kg/m3]
+        if phaseSpace:
+            rho = spike.rho(r, v_cut = u/1000) *Mo/pc**3 # [kg/m3]
+        else:
+            rho = spike.rho(r) *Mo/pc**3 # [kg/m3]
     
-    F = 4 *np.pi *(G *m2 *Mo)**2 *np.log(Lambda) /u**2 *rho
+    F = 4 *np.pi *(G *m2 *Mo)**2 *np.log(Lambda_) /u**2 *rho
     
     return F
 
-def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True) -> tuple:
+def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True, Lambda = True) -> tuple:
     """ Calculates the time-averaged energy and angular momentum loss rates experienced by the components of the
     spike-halo system due to dynamical friction over a single orbit.
     
@@ -122,12 +131,12 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     * isStaticCDM controls if a static CDM spike will be assumed based on the spike's parameters.
     * phaseSpace controls if the static CDM spike will have constant or moving particles.
     """
-    m1 = spike.M_BH; m2 = spike.M_NS
+    m1 = spike.m1; m2 = spike.m2
     m = m1 +m2 # [M_sun] The total mass.
     
     if e == 0: # Bypass the force averaging for circular orbits.
         u = getOrbitalVelocity(a, 0, 0, m) # [m/s]
-        dEdt = F_DF(a, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) *u
+        dEdt = F_DF(a, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace, Lambda = Lambda) *u
         dLdt = dEdt /np.sqrt(G *m *Mo/ (a *pc)**3)
         
         return dEdt, dLdt
@@ -138,7 +147,7 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     
     r = getSeparation(a, e, theta) # [pc]
     u = getOrbitalVelocity(a, e, theta, m) # [m/s]
-    F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace) # [kg m/s2]
+    F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace, Lambda = Lambda) # [kg m/s2]
     
     # Integrate forces and add weights.
     int1 = simpson(F *u / (1 +e *np.cos(theta))**2, theta/np.pi)
@@ -151,6 +160,7 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
 
 def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float) -> tuple:
     dadt = dEdt *2 *(a *pc)**2 / (G *m1 *m2 *Mo**2) /pc # [pc/s]
+    
     if e > 0:
         dedt = -(1 -e**2)/2/e *(dEdt/E_orb(a, m1, m2) +2 *dLdt/L_orb(a, e, m1, m2)) # [1/s]
     else:

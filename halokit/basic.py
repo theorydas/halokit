@@ -35,7 +35,7 @@ def getRisco(m: float) -> float:
   for a massive object of mass m [M_sun].
   """
   
-  return 6 *G *m *Mo/c**2 /pc # [pc]
+  return 6 *G *m *Mo/c**2 /pc # [pc] # = 3 Rs
 
 def getFisco(m1: float, m2: float) -> float:
   """ Calculates the orbital frequency [Hz] of the Innermost Stable Circular Orbit
