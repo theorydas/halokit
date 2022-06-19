@@ -188,7 +188,7 @@ class DistributionFunction(ABC):
     def totalEnergy(self) -> float:
         """ The total energy of the dark matter halo. """
         return simpson(-self.P_eps() * self.eps_grid, self.eps_grid)
-
+    
     def b_90(self, r2: float, Delta_u: float) -> float:
         """ The impact parameter [pc] at which dark matter particles are deflected at a 90 degree angle.
             Delta_u relative velocity of the orbiting body and dark matter particles, usually set at u_orb
@@ -200,6 +200,12 @@ class DistributionFunction(ABC):
         """ The minimum impact parameter [pc] is the radius of the companion m2. """
         return self.R/pc_to_km if self.R != -1 else 6.0 * G_N * self.m2/ c ** 2 # [pc]
 
+    def b_acc(self, r2: float, v_orb: float = -1) -> float:
+        """ The maximum impact parameter [pm] within which particles will accrete on the companion m2. """
+        if v_orb == -1: v_orb = np.sqrt(G_N * (self.m1 + self.m2) / r2) # [km/s]
+        
+        return 4 *G_N *self.m2 /(c *v_orb) *np.sqrt(1 +v_orb**2 /c**2) # [pc]
+    
     def b_max(self, r2: float, v_orb: float = -1) -> float:
         """ The maximum impact parameter [pc] as calculated from gravitational force equivalance O(sqrt(q)).
         
@@ -234,7 +240,7 @@ class DistributionFunction(ABC):
         return 2 * v_orb ** 2 / (1 + self.b_min(r2, v_orb) ** 2 / self.b_90(r2, v_orb) ** 2)
 
 
-    def df(self, r2: float, v_orb: float, v_cut: float = -1) -> np.array:
+    def df(self, r2: float, v_orb: float, v_cut: float = -1, hasDF = True, hasAccretion = False, hasAccretionLimit = False) -> np.array:
         """The change of the distribution function f(eps) during an orbit.
 
         Parameters:
@@ -243,15 +249,24 @@ class DistributionFunction(ABC):
             - v_cut (optional), only scatter with particles slower than v_cut [km/s]
                     defaults to v_max(r) (i.e. all particles).
         """
+        if hasDF:
+            # When accretion present restric bmin to bacc.
+            df_minus = self.df_minus(r2, v_orb, v_cut, N_KICK, accretion = hasAccretionLimit)
+            df_plus = self.df_plus(r2, v_orb, v_cut, N_KICK, accretion = hasAccretionLimit)
+            
+            N_plus = 1 # np.trapz(self.DoS*f_plus, self.eps_grid)
+            N_minus = 1 # np.trapz(-self.DoS*f_minus, self.eps_grid)
+            
+            df_feedback = df_minus + df_plus *(N_minus/N_plus)
+        else:
+            df_feedback = 0
         
-        df_minus = self.df_minus(r2, v_orb, v_cut, N_KICK)
-        df_plus = self.df_plus(r2, v_orb, v_cut, N_KICK)
-        
-        # TODO: What is this meant for?
-        N_plus = 1 # np.trapz(self.DoS*f_plus, self.eps_grid)
-        N_minus = 1 # np.trapz(-self.DoS*f_minus, self.eps_grid)
-        
-        return df_minus + df_plus *(N_minus/N_plus)
+        if hasAccretion:
+            df_accretion = self.df_accretion(r2, v_orb, v_cut, N_KICK)
+
+            return df_feedback +df_accretion
+        else:
+            return df_feedback
     
     def dfdt(self, r2: float, v_orb: float, v_cut: float = -1) -> np.array:
         """Time derivative of the distribution function f(eps).
@@ -291,9 +306,9 @@ class DistributionFunction(ABC):
 
         return f_minus + f_plus
 
-    def P_delta_eps(self, r: float, v: float, delta_eps: float) -> float:
+    def P_delta_eps(self, r: float, v: float, delta_eps: float, bmin, bmax) -> float:
         """ Calcuate PDF for delta_eps. """
-        norm = self.b_90(r, v) ** 2 / (self.b_max(r, v) ** 2 - self.b_min(r, v) ** 2)
+        norm = self.b_90(r, v) ** 2 / (bmax(r, v) ** 2 - bmin(r, v) ** 2)
         
         return 2 * norm * v ** 2 / (delta_eps ** 2)
 
@@ -391,7 +406,7 @@ class DistributionFunction(ABC):
     # ----- df/dt      ----
     # ---------------------
 
-    def df_minus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1) -> np.array:
+    def df_minus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1, accretion = False) -> np.array:
         """Particles to remove from the distribution function at energy E. """
         
         if v_cut < 0: v_cut = self.v_max(r0)
@@ -400,13 +415,16 @@ class DistributionFunction(ABC):
         df = np.zeros(N_GRID)
 
         # Calculate sizes of kicks and corresponding weights for integration
-        if n_kick == 1:  # Replace everything by the average if n_kick = 1
+        if n_kick == 1:  # Replace everything by the average if n_kick = 1 TODO: Possibly replace lambda when accretion present?
             delta_eps_list = (
                 -2 * v_orb ** 2 * np.log(1 + self.Lambda(r0, v_orb) ** 2) / self.Lambda(r0, v_orb) ** 2,
             )
             frac_list = (1,)
         else:
-            b_list = np.geomspace(self.b_min(r0, v_orb), self.b_max(r0, v_orb), n_kick)
+            bmin = self.b_acc if accretion else self.b_min
+            
+            b_list = np.geomspace(bmin(r0, v_orb), self.b_max(r0, v_orb), n_kick)
+            
             delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
 
             # Step size for trapezoidal integration
@@ -415,7 +433,7 @@ class DistributionFunction(ABC):
             step = np.append(0, step)
 
             # Make sure that the integral is normalised correctly
-            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list), delta_eps_list)
+            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = self.b_max), delta_eps_list)
             frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
 
         # Sum over the kicks
@@ -467,11 +485,10 @@ class DistributionFunction(ABC):
         
         return result
 
-    def df_plus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1, correction = 1) -> np.array:
+    def df_plus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1, correction = 1, accretion = False) -> np.array:
         """Particles to add back into distribution function from E - dE -> E. """
         
         if v_cut < 0: v_cut = self.v_max(r0)
-        # if v_cut > self.v_max(r0): v_cut = self.v_max(r0)
 
         df = np.zeros(N_GRID)
 
@@ -482,7 +499,9 @@ class DistributionFunction(ABC):
             )
             frac_list = (1,)
         else:
-            b_list = np.geomspace(self.b_min(r0, v_orb), self.b_max(r0, v_orb), n_kick)
+            bmin = self.b_acc if accretion else self.b_min
+            
+            b_list = np.geomspace(bmin(r0, v_orb), self.b_max(r0, v_orb), n_kick)
             delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
 
             # Step size for trapezoidal integration
@@ -491,7 +510,7 @@ class DistributionFunction(ABC):
             step = np.append(0, step)
 
             # Make sure that the integral is normalised correctly
-            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list), delta_eps_list)
+            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = self.b_max), delta_eps_list)
             frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
 
         # Sum over the kicks
@@ -552,6 +571,83 @@ class DistributionFunction(ABC):
         
         return result
 
+    def df_accretion(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1) -> np.array:
+        """Particles to remove from the distribution function at energy E. """
+        
+        v_cut = self.v_max(r0) # All particles should be able to accrete.
+        
+        df = np.zeros(N_GRID)
+
+        # Calculate sizes of kicks and corresponding weights for integration
+        if n_kick == 1:  # Replace everything by the average if n_kick = 1
+            delta_eps_list = (
+                -2 * v_orb ** 2 * np.log(1 + self.Lambda(r0, v_orb) ** 2) / self.Lambda(r0, v_orb) ** 2,
+            )
+            frac_list = (1,)
+        else:
+            bmin = self.b_min; bmax = self.b_acc
+            
+            b_list = np.geomspace(bmin(r0, v_orb), bmax(r0, v_orb), n_kick)
+            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
+
+            # Step size for trapezoidal integration
+            step = delta_eps_list[1:] - delta_eps_list[:-1]
+            step = np.append(step, 0)
+            step = np.append(0, step)
+
+            # Make sure that the integral is normalised correctly
+            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = bmax), delta_eps_list)
+            frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
+
+        # Sum over the kicks
+        for delta_eps, b, frac in zip(delta_eps_list, b_list, frac_list):
+            # Define which energies are allowed to scatter
+            mask = (self.eps_grid > self.psi(r0) * (1 - b / r0) - 0.5 * v_cut ** 2) & (
+                self.eps_grid < self.psi(r0) * (1 + b / r0)
+            )
+
+
+            r_eps = G_N * self.m1 / self.eps_grid[mask]
+            r_cut = G_N * self.m1 / (self.eps_grid[mask] + 0.5 * v_cut ** 2)
+
+            L1 = np.minimum((r0 - r0 ** 2 / r_eps) / b, 0.999999)
+            alpha1 = np.arccos(L1)
+            L2 = np.maximum((r0 - r0 ** 2 / r_cut) / b, -0.999999)
+            alpha2 = np.arccos(L2)
+
+            m = (2 * b / r0) / (1 - (r0 / r_eps) + b / r0)
+            mask1 = (m <= 1) & (alpha2 > alpha1)
+            mask2 = (m > 1) & (alpha2 > alpha1)
+
+
+            N1 = np.zeros(len(m))
+            if np.any(mask1):
+                N1[mask1] = ellipe(m[mask1]) - ellipeinc(
+                    (np.pi - alpha2[mask1]) / 2, m[mask1]
+                )
+            if np.any(mask2):
+                N1[mask2] = ellipeinc_alt((np.pi - alpha1[mask2]) / 2, m[mask2])
+            df[mask] += (
+                -frac
+                * self.f_eps[mask]
+                * (1 + b ** 2 / self.b_90(r0, v_orb) ** 2) ** 2
+                * np.sqrt(1 - r0 / r_eps + b / r0)
+                * N1
+            )
+
+        norm = (
+            2
+            * np.sqrt(2 * (self.psi(r0)))
+            * 4
+            * np.pi ** 2
+            * r0
+            * (self.b_90(r0, v_orb) ** 2 / (v_orb) ** 2)
+        )
+        result = norm * df / self.DoS
+        result[self.eps_grid >= 0.9999 *self.psi(self.r_isco)] *= 0
+        
+        return result
+    
     def dEdt_ej(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = N_KICK, correction = np.ones(N_GRID)):
         """Calculate carried away by particles which are completely unbound.
 

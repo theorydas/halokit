@@ -6,6 +6,41 @@ from .halos import getKsiCDM, rho_spike
 from .basic import E_orb, L_orb
 from . import HaloFeedback
 
+def Ksi_DF(spike, r, u, a = -1):
+    psi = spike.psi(r) # [km2/s2]
+    v = np.sqrt(2 *(psi -spike.eps_grid))
+    mask = (spike.eps_grid < psi) #& (v >= u)
+    
+    f_v = 4 *np.pi *v**2 *spike.f_eps
+    P = u +v; D = np.abs(u -v)
+    
+    terms = -4*(P -D)
+    terms += ( (u**2 -v**2)*np.sqrt(2*a) +np.sqrt(2/a) ) *(np.arctan(P *np.sqrt(2*a) +1) +np.arctan(P *np.sqrt(2*a) -1) -np.arctan(D *np.sqrt(2*a) +1) -np.arctan(D *np.sqrt(2*a) -1))
+    terms += np.log(np.sqrt(1 +a**2 *P**4)) *(4 *v -np.sqrt(2/a) -(u**2 -v**2) *np.sqrt(2*a))
+    terms += np.log(np.sqrt(1 +a**2 *D**4)) *(4 *v *np.sign(u-v) +np.sqrt(2/a) +(u**2 -v**2) *np.sqrt(2*a))
+    terms += +np.sqrt(2*a) *(u**2 -v**2) *np.log( (1 +a*P**2 -np.sqrt(2*a) *P)/(1 +a*D**2 -np.sqrt(2*a) *D) )
+    terms +=np.sqrt(2/(a)) *np.log((1+a*P**2 +np.sqrt(2*a) *P)/(1+a*D**2 +np.sqrt(2*a) *D))
+    
+    integrand = f_v *terms/4/v/2 # 2 for half the logarithm.
+    return simpson(integrand[mask], v[mask])/spike.rho(r)
+
+def Ksi_DF_Sandwitch(spike, r, u):
+    psi = spike.psi(r) # [km2/s2]
+    c3 = c *1e-3 # [km/s]}
+    
+    v = np.sqrt(2 *(psi -spike.eps_grid))
+    mask = (spike.eps_grid < psi) #& (v <= u)
+    
+    f_v = 4 *np.pi *v**2 *spike.f_eps
+    P = u +v; D = np.abs(u -v)
+    
+    terms = (P -D) *( (u**2 -v**2)/c3**2 -33/16 ) +(P**3 -D**3)/(3 *c3**2)
+    terms += 2 *v *np.log(1 +16 *P**2 /c3**2) +2 *v *np.sign(u-v) *np.log(1 +16 *D**2 /c3**2)
+    terms += (np.arctan(4*P/c3) -np.arctan(4*D/c3)) *( 31*(u**2 -v**2)/4/c3 +33 *c3/64)
+    
+    integrand = f_v *terms/4/v/2 # 2 for half the logarithm.
+    return simpson(integrand[mask], v[mask])/spike.rho(r)
+
 def getGridSizeForEccentricity(e: float) -> float:
     """ Returns an empirically calcultaed grid size for integration of eliptical orbits roughly based on
     the eccentricity number to improve speed when convergence is easier on lower eccentricities.
@@ -110,6 +145,9 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
         
         # The fraction of the density with DM particles moving u < uorb of the companion.
         ksi = getKsiCDM(m2/m1, spike.gamma, u/umax) if phaseSpace else 1
+        
+        # Lambda_bar = spike.b_max(r) /HaloFeedback.G_N/spike.m2
+        # ksi = (Ksi_DF(spike, r, u/1000, Lambda_bar) - Ksi_DF_Sandwitch(spike, r, u/1000)) /np.log(Lambda_) if phaseSpace else 1
         rho = rho_spike(r, spike.gamma, spike.rho_sp, m1) *ksi # [kg/m3]
     else:
         if phaseSpace:
