@@ -8,6 +8,7 @@ from . import HaloFeedback
 
 def Ksi_DF(spike, r, u, a = -1):
     psi = spike.psi(r) # [km2/s2]
+    # print(spike.eps_grid/psi)
     v = np.sqrt(2 *(psi -spike.eps_grid))
     mask = (spike.eps_grid < psi) #& (v >= u)
     
@@ -22,7 +23,11 @@ def Ksi_DF(spike, r, u, a = -1):
     terms +=np.sqrt(2/(a)) *np.log((1+a*P**2 +np.sqrt(2*a) *P)/(1+a*D**2 +np.sqrt(2*a) *D))
     
     integrand = f_v *terms/4/v/2 # 2 for half the logarithm.
-    return simpson(integrand[mask], v[mask])/spike.rho(r)
+    # if np.sum(mask) == 0: return 1
+    
+    ksi = simpson(integrand[mask], v[mask])/spike.rho(r)
+    
+    return np.nan_to_num(ksi)
 
 def Ksi_DF_Sandwitch(spike, r, u):
     psi = spike.psi(r) # [km2/s2]
@@ -39,7 +44,9 @@ def Ksi_DF_Sandwitch(spike, r, u):
     terms += (np.arctan(4*P/c3) -np.arctan(4*D/c3)) *( 31*(u**2 -v**2)/4/c3 +33 *c3/64)
     
     integrand = f_v *terms/4/v/2 # 2 for half the logarithm.
-    return simpson(integrand[mask], v[mask])/spike.rho(r)
+    
+    ksi = simpson(integrand[mask], v[mask])/spike.rho(r)
+    return np.nan_to_num(ksi)
 
 def getGridSizeForEccentricity(e: float) -> float:
     """ Returns an empirically calcultaed grid size for integration of eliptical orbits roughly based on
@@ -156,8 +163,10 @@ def F_DF(r: float, u: float, spike: HaloFeedback.DistributionFunction, isStaticC
             rho = spike.rho(r) *Mo/pc**3 # [kg/m3]
     
     F = 4 *np.pi *(G *m2 *Mo)**2 *np.log(Lambda_) /u**2 *rho
-    
+
     return F
+
+F_DF_ = np.vectorize(F_DF)
 
 def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: float, isStaticCDM = False, phaseSpace: bool = True, Lambda = True) -> tuple:
     """ Calculates the time-averaged energy and angular momentum loss rates experienced by the components of the
@@ -185,7 +194,9 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     
     r = getSeparation(a, e, theta) # [pc]
     u = getOrbitalVelocity(a, e, theta, m) # [m/s]
-    F = np.vectorize(F_DF)(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace, Lambda = Lambda) # [kg m/s2]
+    # print(a, e, r)
+    # print(1)
+    F = F_DF_(r, u, spike, isStaticCDM = isStaticCDM, phaseSpace = phaseSpace, Lambda = Lambda) # [kg m/s2]
     
     # Integrate forces and add weights.
     int1 = simpson(F *u / (1 +e *np.cos(theta))**2, theta/np.pi)
@@ -196,11 +207,15 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     
     return dEdt, dLdt
 
-def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float) -> tuple:
+def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float, dm2dt: float = 0) -> tuple:
     dadt = dEdt *2 *(a *pc)**2 / (G *m1 *m2 *Mo**2) /pc # [pc/s]
+    dadt += a/m2 *dm2dt
     
     if e > 0:
-        dedt = -(1 -e**2)/2/e *(dEdt/E_orb(a, m1, m2) +2 *dLdt/L_orb(a, e, m1, m2)) # [1/s]
+        X = dEdt/E_orb(a, m1, m2) +2 *dLdt/L_orb(a, e, m1, m2)
+        # X += -dm2dt/(m1 +m2) *(2 +3 *m1/m2)
+        X += -3 *dm2dt/(m1 +m2) /m2
+        dedt = -(1 -e**2)/2/e *X # [1/s]
     else:
         dedt = 0
     

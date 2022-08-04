@@ -31,8 +31,10 @@ def ksiRate(r, u, spike):
     p = u+v; d = np.abs(u -v)
     terms = (p -d) + (u**2 /c3**2) *(p**3 -d**3)/3/u**2
     integrand = f_v *terms/2/v
+    # if np.sum(mask) == 0: return 1
+    ksi = simpson(integrand[mask], v[mask])/(1 +u**2 /c3**2)
     
-    return simpson(integrand[mask], v[mask])/(1 +u**2 /c3**2)
+    return np.nan_to_num(ksi)
 
 ksiRate = np.vectorize(ksiRate)
 
@@ -47,8 +49,10 @@ def ksi_Facc(r, u, spike):
     p = u+v; d = np.abs(u -v)
     terms = (u**2 -v**2) *(p -d) +(p**3 -d**3)/3 *(1 +(u**2 -v**2)/c3**2) +(p**5 -d**5)/(5*c3**2)
     integrand = f_v *terms/4/v/u**2
+    # if np.sum(mask) == 0: return 1
+    ksi = simpson(integrand[mask], v[mask])/(1 +u**2 /c3**2)
     
-    return simpson(integrand[mask], v[mask])/(1 +u**2 /c3**2)
+    return np.nan_to_num(ksi)
 
 ksi_Facc = np.vectorize(ksi_Facc)
 
