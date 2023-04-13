@@ -216,7 +216,8 @@ class DistributionFunction(ABC):
         
         if v_orb == -1: v_orb = np.sqrt(G_N * (self.m1 + self.m2) / r2) # [km/s]
         
-        return np.sqrt(self.m2/self.m1) *r2 # [pc]
+        # return np.sqrt(self.m2/self.m1) *r2 # [pc]
+        return (self.m2/self.m1/3)**(1/3) *r2 # [pc]
 
     def Lambda(self, r2: float, v_orb: float = -1) -> float:
         """ The coulomb logarithm of the dynamical friction force induced by the dark matter particles.
