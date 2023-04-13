@@ -189,12 +189,12 @@ class DistributionFunction(ABC):
         """ The total energy of the dark matter halo. """
         return simpson(-self.P_eps() * self.eps_grid, self.eps_grid)
     
-    def b_90(self, r2: float, Delta_u: float) -> float:
+    def b_90(self, r2: float, uorb: float) -> float:
         """ The impact parameter [pc] at which dark matter particles are deflected at a 90 degree angle.
-            Delta_u relative velocity of the orbiting body and dark matter particles, usually set at u_orb
+            uorb the orbital velocity of the companion.
             of the companion object m2.
         """
-        return G_N * self.m2 / (Delta_u ** 2) # [pc]
+        return G_N * self.m2 / (uorb ** 2) # [pc]
 
     def b_min(self, r2: float, v_orb: float) -> float:
         """ The minimum impact parameter [pc] is the radius of the companion m2. """
