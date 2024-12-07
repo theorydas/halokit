@@ -8,7 +8,6 @@ import numpy as np
 from scipy.integrate import simpson
 from scipy.special import ellipeinc, ellipkinc, ellipe, betainc
 from scipy.special import gamma as Gamma
-from scipy.special import beta as Beta
 
 # ------------------
 G_N = 4.300905557082141e-3  # [(km/s)^2 pc/M_sun] [Legacy: 4.3021937e-3]
