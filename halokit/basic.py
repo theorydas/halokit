@@ -1,5 +1,4 @@
-from sympy import false
-from .units import *
+from halokit.units import *
 
 import numpy as np
 

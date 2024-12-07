@@ -48,6 +48,23 @@ def Ksi_DF_Sandwitch(spike, r, u):
     ksi = simpson(integrand[mask], v[mask])/spike.rho(r)
     return np.nan_to_num(ksi)
 
+def numerical_ksi_u(spike, r, u):
+    psi = spike.psi(r) # [km2/s2]
+    
+    v = np.sqrt(2 *(psi -spike.eps_grid))
+    mask = (spike.eps_grid < psi)
+    
+    f_3d = spike.f_eps/spike.rho(r)
+    f_v = 4 *np.pi *v**2 *f_3d
+    
+    terms = np.ones_like(v)
+    terms[v > u] = 0
+    
+    integrand = f_v *terms
+    
+    ksi = simpson(integrand[mask], v[mask])
+    return np.nan_to_num(ksi)
+
 def getGridSizeForEccentricity(e: float) -> float:
     """ Returns an empirically calcultaed grid size for integration of eliptical orbits roughly based on
     the eccentricity number to improve speed when convergence is easier on lower eccentricities.
@@ -207,14 +224,13 @@ def averageDFLossRates(spike: HaloFeedback.DistributionFunction, a: float, e: fl
     
     return dEdt, dLdt
 
-def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float, dm2dt: float = 0) -> tuple:
+def getOrbitUpdate(dEdt: float, dLdt: float, a: float, e: float, m1: float, m2: float, dm2dt: float = 0, dm2dt_weighted: float = 0) -> tuple:
     dadt = dEdt *2 *(a *pc)**2 / (G *m1 *m2 *Mo**2) /pc # [pc/s]
-    dadt += a/m2 *dm2dt
+    dadt += a/(m1 +m2) *(2 *dm2dt_weighted -dm2dt)
     
     if e > 0:
         X = dEdt/E_orb(a, m1, m2) +2 *dLdt/L_orb(a, e, m1, m2)
-        # X += -dm2dt/(m1 +m2) *(2 +3 *m1/m2)
-        X += -3 *dm2dt/(m1 +m2) /m2
+        X += 2/(m1 +m2) *(dm2dt_weighted -dm2dt)
         dedt = -(1 -e**2)/2/e *X # [1/s]
     else:
         dedt = 0

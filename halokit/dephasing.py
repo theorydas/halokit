@@ -1,7 +1,6 @@
-from .halos import getStaticBreakFrequency, getDynamicBreakFrequency
-from .basic import getFisco, getVacuumPhase
+from halokit.halos import getStaticBreakFrequency, getDynamicBreakFrequency
+from halokit.basic import getFisco, getVacuumPhase
 
-from scipy.integrate import cumtrapz
 from scipy.special import hyp2f1
 from tqdm.notebook import tqdm
 import numpy as np

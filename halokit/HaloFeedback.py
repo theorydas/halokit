@@ -26,7 +26,7 @@ float_2eps = 2.0 * np.finfo(float).eps
 
 def ellipeinc_alt(phi, m):
     """ An alternative elliptic function that is valid for m > 1."""
-    beta = np.arcsin(np.clip(np.sqrt(m) * np.sin(phi), 0, 1))
+    beta = np.arcsin(np.clip(np.sqrt(m) * np.sin(phi), 0, 1)) # Clipping to 0 instead of -1, since phi = [0, pi]
     return np.sqrt(m) * ellipeinc(beta, 1 / m) + ((1 - m) / np.sqrt(m)) * ellipkinc(beta, 1 / m)
 
 
@@ -218,6 +218,7 @@ class DistributionFunction(ABC):
         
         # return np.sqrt(self.m2/self.m1) *r2 # [pc]
         return (self.m2/self.m1/3)**(1/3) *r2 # [pc]
+        # return 0.3 *r2 # [pc]
 
     def Lambda(self, r2: float, v_orb: float = -1) -> float:
         """ The coulomb logarithm of the dynamical friction force induced by the dark matter particles.
@@ -241,7 +242,7 @@ class DistributionFunction(ABC):
         return 2 * v_orb ** 2 / (1 + self.b_min(r2, v_orb) ** 2 / self.b_90(r2, v_orb) ** 2)
 
 
-    def df(self, r2: float, v_orb: float, v_cut: float = -1, hasDF = True, hasAccretion = False, hasAccretionLimit = False) -> np.array:
+    def df(self, r2: float, v_orb: float, a: float = -1, e: float = 0, v_cut: float = -1, hasDF = True, hasAccretion = False, hasAccretionLimit = False) -> np.array:
         """The change of the distribution function f(eps) during an orbit.
 
         Parameters:
@@ -249,11 +250,15 @@ class DistributionFunction(ABC):
             - v_orb is the orbital velocity [km/s] of the perturbing body.
             - v_cut (optional), only scatter with particles slower than v_cut [km/s]
                     defaults to v_max(r) (i.e. all particles).
+            - a is the semi-major axis [pc] of the orbit.
+            - e is the eccentricity of the orbit.
         """
+        if a == -1: a = r2
+        
         if hasDF:
             # When accretion present restric bmin to bacc.
-            df_minus = self.df_minus(r2, v_orb, v_cut, N_KICK, accretion = hasAccretionLimit)
-            df_plus = self.df_plus(r2, v_orb, v_cut, N_KICK, accretion = hasAccretionLimit)
+            df_minus = self.df_minus(r2, v_orb, a, e, v_cut, N_KICK, accretion = hasAccretionLimit)
+            df_plus = self.df_plus(r2, v_orb, a, e, v_cut, N_KICK, accretion = hasAccretionLimit)
             
             N_plus = 1 # np.trapz(self.DoS*f_plus, self.eps_grid)
             N_minus = 1 # np.trapz(-self.DoS*f_minus, self.eps_grid)
@@ -269,7 +274,7 @@ class DistributionFunction(ABC):
         else:
             return df_feedback
     
-    def dfdt(self, r2: float, v_orb: float, v_cut: float = -1) -> np.array:
+    def dfdt(self, r2: float, v_orb: float, a: float = -1, e: float = 0, v_cut: float = -1) -> np.array:
         """Time derivative of the distribution function f(eps).
 
         Parameters:
@@ -278,9 +283,10 @@ class DistributionFunction(ABC):
             - v_cut (optional), only scatter with particles slower than v_cut [km/s]
                     defaults to v_max(r) (i.e. all particles).
         """
-        T_orb = self.T_orb(r2) # [s]
+        if a == -1: a = r2
+        T_orb = self.T_orb(a) # [s]
         
-        return self.df(r2, v_orb, v_cut) /T_orb
+        return self.df(r2 = r2, v_orb = v_orb, a = a, e = e, v_cut = v_cut) /T_orb
 
     def delta_f(self, r0: float, v_orb: float, dt: float, v_cut: float = -1) -> np.array:
         """[Deprecated] This shouldn't be used in new applications. TODO: Remove?
@@ -310,6 +316,7 @@ class DistributionFunction(ABC):
     def P_delta_eps(self, r: float, v: float, delta_eps: float, bmin, bmax) -> float:
         """ Calcuate PDF for delta_eps. """
         norm = self.b_90(r, v) ** 2 / (bmax(r, v) ** 2 - bmin(r, v) ** 2)
+        # We take b_90 at the semi-major axis as an average, and place bmax, bmin at their proper values.
         
         return 2 * norm * v ** 2 / (delta_eps ** 2)
 
@@ -407,9 +414,10 @@ class DistributionFunction(ABC):
     # ----- df/dt      ----
     # ---------------------
 
-    def df_minus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1, accretion = False) -> np.array:
+    def df_minus(self, r0: float, v_orb: float, a: float = -1, e: float = 0, v_cut: float = -1, n_kick: int = 1, accretion = False) -> np.array:
         """Particles to remove from the distribution function at energy E. """
         
+        if a == -1: a = r0
         if v_cut < 0: v_cut = self.v_max(r0)
         # if v_cut > self.v_max(r0): v_cut = self.v_max(r0)
         
@@ -423,18 +431,21 @@ class DistributionFunction(ABC):
             frac_list = (1,)
         else:
             bmin = self.b_acc if accretion else self.b_min
+            r_peri = a *(1 -e); r_apo = a *(1 +e)
+            v_peri = v_orb *np.sqrt((1+e)/(1-e)); v_apo = v_orb *np.sqrt((1-e)/(1+e))
             
-            b_list = np.geomspace(bmin(r0, v_orb), self.b_max(r0, v_orb), n_kick)
-            
-            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
+            b_list = np.geomspace(bmin(r_peri, v_peri), self.b_max(r_apo, v_apo), n_kick)
+            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list) # < 0
 
             # Step size for trapezoidal integration
             step = delta_eps_list[1:] - delta_eps_list[:-1]
             step = np.append(step, 0)
             step = np.append(0, step)
 
+            P_delta_eps = 2 * self.b_90(r0, v_orb) ** 2 / (b_list[-1] ** 2 - b_list[0] ** 2) * v_orb ** 2 / (delta_eps_list ** 2)
+        
             # Make sure that the integral is normalised correctly
-            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = self.b_max), delta_eps_list)
+            renorm = np.trapz(P_delta_eps, delta_eps_list)
             frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
 
         # Sum over the kicks
@@ -486,11 +497,12 @@ class DistributionFunction(ABC):
         
         return result
 
-    def df_plus(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1, correction = 1, accretion = False) -> np.array:
+    def df_plus(self, r0: float, v_orb: float, a: float = -1, e: float = 0, v_cut: float = -1, n_kick: int = 1, correction = 1, accretion = False) -> np.array:
         """Particles to add back into distribution function from E - dE -> E. """
         
         if v_cut < 0: v_cut = self.v_max(r0)
-
+        if a == -1: a = r0
+        
         df = np.zeros(N_GRID)
 
         # Calculate sizes of kicks and corresponding weights for integration
@@ -501,17 +513,21 @@ class DistributionFunction(ABC):
             frac_list = (1,)
         else:
             bmin = self.b_acc if accretion else self.b_min
+            r_peri = a *(1 -e); r_apo = a *(1 +e)
+            v_peri = v_orb *np.sqrt((1+e)/(1-e)); v_apo = v_orb *np.sqrt((1-e)/(1+e))
             
-            b_list = np.geomspace(bmin(r0, v_orb), self.b_max(r0, v_orb), n_kick)
-            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
+            b_list = np.geomspace(bmin(r_peri, v_peri), self.b_max(r_apo, v_apo), n_kick)
+            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list) # < 0, Take an average for v_orb.
 
             # Step size for trapezoidal integration
             step = delta_eps_list[1:] - delta_eps_list[:-1]
             step = np.append(step, 0)
             step = np.append(0, step)
-
+            
+            P_delta_eps = 2 * self.b_90(r0, v_orb) ** 2 / (b_list[-1] ** 2 - b_list[0] ** 2) * v_orb ** 2 / (delta_eps_list ** 2)
+        
             # Make sure that the integral is normalised correctly
-            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = self.b_max), delta_eps_list)
+            renorm = np.trapz(P_delta_eps, delta_eps_list)
             frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
 
         # Sum over the kicks
@@ -559,83 +575,6 @@ class DistributionFunction(ABC):
                     * np.sqrt(1 - r0 / r_eps + b / r0)
                     * N1
                 )
-        norm = (
-            2
-            * np.sqrt(2 * (self.psi(r0)))
-            * 4
-            * np.pi ** 2
-            * r0
-            * (self.b_90(r0, v_orb) ** 2 / (v_orb) ** 2)
-        )
-        result = norm * df / self.DoS
-        result[self.eps_grid >= 0.9999 *self.psi(self.r_isco)] *= 0
-        
-        return result
-
-    def df_accretion(self, r0: float, v_orb: float, v_cut: float = -1, n_kick: int = 1) -> np.array:
-        """Particles to remove from the distribution function at energy E. """
-        
-        v_cut = self.v_max(r0) # All particles should be able to accrete.
-        
-        df = np.zeros(N_GRID)
-
-        # Calculate sizes of kicks and corresponding weights for integration
-        if n_kick == 1:  # Replace everything by the average if n_kick = 1
-            delta_eps_list = (
-                -2 * v_orb ** 2 * np.log(1 + self.Lambda(r0, v_orb) ** 2) / self.Lambda(r0, v_orb) ** 2,
-            )
-            frac_list = (1,)
-        else:
-            bmin = self.b_min; bmax = self.b_acc
-            
-            b_list = np.geomspace(bmin(r0, v_orb), bmax(r0, v_orb), n_kick)
-            delta_eps_list = self.delta_eps_of_b(r0, v_orb, b_list)
-
-            # Step size for trapezoidal integration
-            step = delta_eps_list[1:] - delta_eps_list[:-1]
-            step = np.append(step, 0)
-            step = np.append(0, step)
-
-            # Make sure that the integral is normalised correctly
-            renorm = np.trapz(self.P_delta_eps(r0, v_orb, delta_eps_list, bmin = bmin, bmax = bmax), delta_eps_list)
-            frac_list = 0.5 * (step[:-1] + step[1:]) / renorm
-
-        # Sum over the kicks
-        for delta_eps, b, frac in zip(delta_eps_list, b_list, frac_list):
-            # Define which energies are allowed to scatter
-            mask = (self.eps_grid > self.psi(r0) * (1 - b / r0) - 0.5 * v_cut ** 2) & (
-                self.eps_grid < self.psi(r0) * (1 + b / r0)
-            )
-
-
-            r_eps = G_N * self.m1 / self.eps_grid[mask]
-            r_cut = G_N * self.m1 / (self.eps_grid[mask] + 0.5 * v_cut ** 2)
-
-            L1 = np.minimum((r0 - r0 ** 2 / r_eps) / b, 0.999999)
-            alpha1 = np.arccos(L1)
-            L2 = np.maximum((r0 - r0 ** 2 / r_cut) / b, -0.999999)
-            alpha2 = np.arccos(L2)
-
-            m = (2 * b / r0) / (1 - (r0 / r_eps) + b / r0)
-            mask1 = (m <= 1) & (alpha2 > alpha1)
-            mask2 = (m > 1) & (alpha2 > alpha1)
-
-
-            N1 = np.zeros(len(m))
-            if np.any(mask1):
-                N1[mask1] = ellipe(m[mask1]) - ellipeinc(
-                    (np.pi - alpha2[mask1]) / 2, m[mask1]
-                )
-            if np.any(mask2):
-                N1[mask2] = ellipeinc_alt((np.pi - alpha1[mask2]) / 2, m[mask2])
-            df[mask] += (
-                -frac
-                * self.f_eps[mask]
-                * (1 + b ** 2 / self.b_90(r0, v_orb) ** 2) ** 2
-                * np.sqrt(1 - r0 / r_eps + b / r0)
-                * N1
-            )
-
         norm = (
             2
             * np.sqrt(2 * (self.psi(r0)))

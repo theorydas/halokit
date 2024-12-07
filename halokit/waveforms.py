@@ -194,11 +194,13 @@ def buildPhase(f: np.array, dPhase: np.array, m1: float, m2: float):
 # Old functions
 def getTemplatePSD(source: str) -> np.array:
   """ Imports PSDs from sources and stuff"""
-  PSD_Source = {"_LIGO": "https://dcc.ligo.org/public/0149/T1800044/005/aLIGODesign.txt", "LIGO": "https://dcc.ligo.org/public/0156/G1801950/001/2017-06-10_DCH_C02_H1_O2_Sensitivity_strain_asd.txt"}
+  PSD_Source = {"_LIGO": "https://dcc.ligo.org/public/0149/T1800044/005/aLIGODesign.txt", "LIGO": "https://dcc.ligo.org/public/0156/G1801950/001/2017-06-10_DCH_C02_H1_O2_Sensitivity_strain_asd.txt", "CE": "./cosmic_explorer_strain.txt", "_ET": "https://apps.et-gw.eu/tds/?call_file=ET-0000A-18_ETDSensitivityCurveTxtFile.txt", "ET": "./einstein_telescope.txt"}
+  # A relative path to StrainSources/cosmic_explorer_strain.txt
+  # path = 
   
-  f, psd = np.loadtxt(PSD_Source[source]).T
+  data = np.loadtxt(PSD_Source[source]).T
 
-  return f, psd
+  return data # [f, PSD]
 
 def calculatePSD(f, source):
   if source == "White":
@@ -286,45 +288,6 @@ def getStrainFromDephase_(f: np.array, dPhase: np.array, m1: float, m2: float, s
 
 getStrainFromDephase = lambda F, DPHASE, M1, M2: np.array([getStrainFromDephase_(f_, Dph_, m1_, m2_) for f_, Dph_, m1_, m2_ in tqdm(zip(F, DPHASE, M1, M2)) ])
 getShortMismatch = lambda h_true, h_pred, freq: np.array([getShortMismatch(h_true_, h_pred_, freq_, "White") for h_true_, h_pred_, freq_ in tqdm(zip(h_true, h_pred, freq))]).T[0].astype(complex).real
-
-from scipy.special import jv
-
-def C_plus(n: int = 2, e: float = 1e-4, i: float = 0, b: float = 0):
-    si = np.sin(i)
-    ci = np.cos(i)
-    c2b = np.cos(2 *b)
-    
-    termInside = (e**2 -2)*jv(n, n*e) +n*e *(1 -e**2) *( jv(n -1, n*e) - jv(n+1, n*e) )
-    term = 2 *si**2 *jv(n, n*e) -2/e**2 *(1 +ci**2) *c2b *termInside
-    
-    return -term
-
-def S_plus(n: int = 2, e: float = 1e-4, i: float = 0, b: float = 0):
-    ci = np.cos(i)
-    s2b = np.sin(2 *b)
-    
-    termInside = -2 *(1 -e**2) *n *jv(n, n*e) +e*(jv(n-1, n*e)  -jv(n+1, n*e))
-    term = 2/e**2 *np.sqrt(1 -e**2) *(1 +ci**2) *s2b *termInside
-    
-    return -term
-
-def C_cross(n: int = 2, e: float = 1e-4, i: float = 0, b: float = 0):
-    ci = np.cos(i)
-    s2b = np.sin(2 *b)
-    
-    termInside = (2 -e**2)*jv(n, n*e) +n*e *(1 -e**2) *( jv(n -1, n*e) - jv(n+1, n*e) )
-    term = 4/e**2 *ci *s2b *termInside
-    
-    return -term
-
-def S_cross(n: int = 2, e: float = 1e-4, i: float = 0, b: float = 0):
-    ci = np.cos(i)
-    c2b = np.cos(2 *b)
-    
-    termInside = -2 *(1 -e**2) *n *jv(n, n*e) +e*(jv(n-1, n*e)  -jv(n+1, n*e))
-    term = 4/e**2 *np.sqrt(1 -e**2) *ci *c2b *termInside
-    
-    return -term
   
 def C_plusNick(n: int = 2, e: float = 1e-4, i: float = 0, b: float = 0):
     si = np.sin(i)
