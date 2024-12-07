@@ -56,7 +56,7 @@ def getRho6FromSpike(rho_spike: float, gamma_sp: float, m1: float) -> float:
   r6 = 1e-6 # [pc]
   rsp = getRsp(gamma_sp, m1, rho_spike)
 
-  return rho_spike *(r6/rsp)**gamma_sp
+  return rho_spike *(r6/rsp)**-gamma_sp
 
 def getRhoSpikeFrom6(rho6: float, gamma_sp: float, m1: float) -> float:
   """ A conversion from the spike density normalisation rho6 [M_sun/pc3] to rho_spike [M_sun/pc3].
