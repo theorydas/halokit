@@ -695,7 +695,7 @@ class PowerLawSpike(DistributionFunction):
     if rho_sp or gamma are changed after initialization.
     """
 
-    def __init__(self, m1: float = 1e3, m2: float = 1.0, gamma: float = 7/3, rho_sp: float = 226, R: float = -1, mDM: float = 0):
+    def __init__(self, m1: float = 1e3, m2: float = 1.0, gamma: float = 7/3, rho_sp: float = 226, R: float = -1, mDM: float = 0, r_sp: float = -1):
         if gamma <= 1: raise ValueError("Slope must be greater than 1")
         
         self.m1 = m1  # [M_sun]
@@ -712,6 +712,7 @@ class PowerLawSpike(DistributionFunction):
             * self.m1
             / (2 * np.pi * self.rho_sp)
         ) ** (1/3)  # [pc]
+        if r_sp != -1: self.r_sp = r_sp # [pc]
 
         self.IDstr_model = f"gamma={gamma:.2f}_rhosp={rho_sp:.1f}"
 
